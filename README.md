@@ -1,4 +1,4 @@
-# ifthenpay | Payments for GravityForms
+# Ifthenpay | Payments for GravityForms
 
 Adds ifthenpay payment methods to GravityForms: cards, wallets, and local payment options; supports secure one-time payments via pay-by-link.
 
@@ -53,8 +53,8 @@ All settings are made in GravityForms and in your ifthenpay Backoffice. The plug
 
 1. **Install:** Upload the plugin zip via `Plugins → Add New → Upload`, or install from WordPress.org and Activate.
 2. **Credentials:** Ensure your ifthenpay account has an active GravityForms Gateway Key with the desired payment methods enabled.
-3. **Setup:** Go to `GravityForms → Settings → Payments` and enter your Backoffice Key.
-4. **Form config:** `Create/Edit a form → Payments tab → Add the Ifthenpay field on your form → enable "ifthenpay | Payment Gateway"` and select a Gateway Key. Next, choose which payment methods to activate from those available in your gateway, and set your default payment method. Finally, add a payment description, which will be displayed on the ifthenpay payment page for all transactions.
+3. **Setup:** Go to `GravityForms → Settings → Ifthenpay` and enter your Backoffice Key.
+4. **Form config:** `Create/Edit a form → Settings → Ifthenpay → "Add New" Feed` and select a Gateway Key. Next, choose which payment methods to activate from those available in your gateway, and set your default payment method. Finally, add a payment description, which will be displayed on the ifthenpay payment page for all transactions.
 
 ## Frequently Asked Questions
 
