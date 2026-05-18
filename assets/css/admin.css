@@ -1,0 +1,114 @@
+/* ifthenpay | Payments for Gravity Forms — Admin Styles */
+
+/* -------------------------------------------------------------------------
+   Backoffice key row (plugin settings page)
+   ------------------------------------------------------------------------- */
+
+.iftp-gf-key-field-hidden {
+    display: none;
+}
+
+.iftp-gf-key-row {
+    margin: 6px 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* Inline feedback message */
+.iftp-gf-message {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.125rem;
+}
+
+.iftp-gf-message.is-success {
+    color: #0a7227;
+}
+
+.iftp-gf-message.is-error {
+    color: #8a0000;
+}
+
+/* -------------------------------------------------------------------------
+   Payment methods table (feed settings)
+   ------------------------------------------------------------------------- */
+
+.iftp-gf-methods-table {
+    margin-top: 8px;
+    border-collapse: collapse;
+    width: 100%;
+    max-width: 700px;
+}
+
+.iftp-gf-methods-table th,
+.iftp-gf-methods-table td {
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: middle;
+    border-bottom: 1px solid #f0f0f1;
+}
+
+.iftp-gf-methods-table th {
+    background: #f6f7f7;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #50575e;
+}
+
+.iftp-gf-methods-table tr:last-child td {
+    border-bottom: none;
+}
+
+.iftp-gf-methods-table .iftp-gf-account-col code {
+    font-size: 11px;
+    background: #f6f7f7;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.iftp-gf-no-account {
+    color: #8c8f94;
+    font-size: 12px;
+}
+
+.iftp-gf-active-badge {
+    color: #166534;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.iftp-gf-activation-sent,
+.iftp-gf-activation-cooldown {
+    font-size: 12px;
+    color: #646970;
+}
+
+.iftp-gf-activation-sent {
+    color: #166534;
+}
+
+.iftp-gf-no-methods,
+.iftp-gf-loading {
+    color: #8c8f94;
+    font-style: italic;
+    font-size: 13px;
+    margin: 8px 0;
+}
+
+.iftp-gf-error {
+    color: #b42318;
+    font-size: 13px;
+    margin: 8px 0;
+}
+
+.ifthenpay-icon {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    background-color: currentcolor;
+    mask: url('../images/ifthenpay-icon.svg') no-repeat center / contain;
+}

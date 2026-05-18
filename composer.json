@@ -1,0 +1,17 @@
+{
+    "name": "ifthenpay/ifthenpay-payments-for-gravityforms",
+    "description": "ifthenpay Pay by Link integration for Gravity Forms",
+    "type": "wordpress-plugin",
+    "license": "GPL-3.0-or-later",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Ifthenpay\\GravityForms\\": "src/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}

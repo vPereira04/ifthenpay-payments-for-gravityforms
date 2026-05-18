@@ -1,0 +1,227 @@
+/* ifthenpay | Payments for Gravity Forms — Frontend Field Styles */
+
+/* ---- Box-sizing reset for the field ---- */
+.gfield--type-iftp_pbl,
+.gfield--type-iftp_pbl * {
+	box-sizing: border-box;
+}
+
+.iftp-pbl-gf-field {
+	margin: 0;
+	font-family: inherit;
+}
+
+/* ---- Outer card (matches GF orbital border style) ---- */
+.iftp-pbl-public-box {
+	max-width: 100%;
+	border: 1px solid rgb(17 35 55 / 10%);
+	border-radius: var(--gf-radius, 3px);
+	background: #fff;
+	padding: 16px;
+	text-align: left;
+}
+
+/* ---- Header (logo + title) ---- */
+.iftp-pbl-header {
+	display: flex;
+	align-items: center;
+	margin-bottom: 12px;
+}
+
+.iftp-pbl-header-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	border-radius: var(--gf-radius, 3px);
+	background: #f5f5f5;
+	flex-shrink: 0;
+}
+
+.iftp-pbl-header-text {
+	margin-left: 10px;
+	line-height: 1.2;
+}
+
+.iftp-pbl-header-title {
+	font-weight: 600;
+	color: var(--gf-color-out-ctrl-dark-darker, #112337);
+	font-size: var(--gf-font-size-secondary, 14px);
+}
+
+.iftp-pbl-header-subtitle {
+	font-size: var(--gf-font-size-tertiary, 13px);
+	color: var(--gf-color-out-ctrl-dark, #585e6a);
+	margin-top: 2px;
+}
+
+/* ---- Methods row ---- */
+.iftp-pbl-methods-section {
+	padding: 8px 0 4px;
+}
+
+.iftp-pbl-methods-title {
+	font-size: var(--gf-font-size-tertiary, 13px);
+	font-weight: 600;
+	color: var(--gf-color-out-ctrl-dark-darker, #112337);
+	margin-bottom: 10px;
+}
+
+.iftp-pbl-preview-methods {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+}
+
+.iftp-pbl-method-item {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.iftp-pbl-logo {
+	border: 1px solid rgb(17 35 55 / 10%);
+	border-radius: var(--gf-radius, 3px);
+	background: #fff;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 52px;
+	height: 36px;
+	padding: 4px;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.iftp-pbl-method-item[data-entity="CCARD"] .iftp-pbl-logo {
+	width: 90px;
+}
+
+.iftp-pbl-logo img {
+	max-width: 100%;
+	max-height: 100%;
+	object-fit: contain;
+	display: block;
+}
+
+.iftp-pbl-method-item.is-default .iftp-pbl-logo {
+	border-color: var(--gf-color-primary, #204ce5);
+	box-shadow: 0 0 0 1px var(--gf-color-primary, #204ce5);
+}
+
+/* ---- Info block ---- */
+.iftp-pbl-info {
+	margin-top: 12px;
+	padding: 10px 12px;
+	background: #fafafa;
+	border-radius: var(--gf-radius, 3px);
+	font-size: var(--gf-font-size-tertiary, 13px);
+	color: var(--gf-color-out-ctrl-dark, #585e6a);
+}
+
+.iftp-pbl-info strong {
+	color: var(--gf-color-out-ctrl-dark-darker, #112337);
+}
+
+.iftp-pbl-info ul {
+	margin: 6px 0 0;
+	padding-left: 18px;
+}
+
+.iftp-pbl-info ul li + li {
+	margin-top: 2px;
+}
+
+/* ---- Pay button (uses GF orbital token variables) ---- */
+.iftp-pbl-pay-row {
+	margin-top: 18px;
+}
+
+.iftp-pbl-pay-now-button {
+	appearance: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	padding: 10px 20px;
+	background: var(--gf-color-primary, #204ce5);
+	color: var(--gf-color-primary-contrast, #fff);
+	border: 1px solid var(--gf-color-primary, #204ce5);
+	border-radius: var(--gf-radius, 3px);
+	font-size: var(--gf-font-size-secondary, 14px);
+	font-weight: 600;
+	cursor: pointer;
+	line-height: 1.2;
+	transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.iftp-pbl-pay-now-button:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+.iftp-pbl-pay-now-button:hover:not(:disabled) {
+	background: var(--gf-color-primary-darker, #001AB3);
+	border-color: var(--gf-color-primary-darker, #001AB3);
+}
+
+.iftp-pbl-pay-now-button.is-paid {
+	background: #198754;
+	border-color: #198754;
+}
+
+.iftp-pbl-pay-now-button.is-paid:hover {
+	background: #157347;
+	border-color: #157347;
+}
+
+/* ---- Spinner ---- */
+.iftp-pbl-spinner {
+	width: 14px;
+	height: 14px;
+	border: 2px solid rgb(255 255 255 / 40%);
+	border-top-color: #fff;
+	border-radius: 50%;
+	animation: iftp-pbl-spin 0.7s linear infinite;
+	display: none;
+	flex-shrink: 0;
+}
+
+.iftp-pbl-pay-now-button.is-loading .iftp-pbl-spinner {
+	display: inline-block;
+}
+
+@keyframes iftp-pbl-spin {
+	to { transform: rotate(360deg); }
+}
+
+/* ---- Status messages ---- */
+.iftp-pbl-status {
+	margin-top: 12px;
+	padding: 10px 12px;
+	border-radius: var(--gf-radius, 3px);
+	font-size: var(--gf-font-size-tertiary, 13px);
+	display: none;
+}
+
+.iftp-pbl-status.is-visible { display: block; }
+.iftp-pbl-status.is-success { background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; }
+.iftp-pbl-status.is-error   { background: #fdecea; color: #b71c1c; border: 1px solid #f5c6cb; }
+.iftp-pbl-status.is-info    { background: #e3f2fd; color: #0d47a1; border: 1px solid #90caf9; }
+
+.iftp-pbl-runtime-warning {
+	margin-top: 10px;
+	padding: 10px 12px;
+	border-radius: var(--gf-radius, 3px);
+	font-size: var(--gf-font-size-tertiary, 13px);
+	background: #fff8e1;
+	color: #7c5e10;
+	border: 1px solid #ffe082;
+	display: none;
+}
+
+/* ---- Responsive ---- */
+@media (width <= 600px) {
+	.iftp-pbl-public-box     { padding: 12px; }
+	.iftp-pbl-pay-now-button { width: 100%; }
+}
