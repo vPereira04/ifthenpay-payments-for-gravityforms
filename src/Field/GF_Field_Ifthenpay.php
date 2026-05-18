@@ -23,7 +23,7 @@ class GF_Field_Ifthenpay extends \GF_Field {
 	}
 
 	public function get_form_editor_field_icon(): string {
-		return IFTP_GF_URL . 'assets/images/ifthenpay-icon.svg';
+		return IFTP_GF_URL . 'assets/images/ifthenpay-small-icon.svg';
 	}
 
 	public function get_form_editor_button(): array {
@@ -70,16 +70,39 @@ class GF_Field_Ifthenpay extends \GF_Field {
 		$gateway_key    = (string) rgar( $feed['meta'], 'gateway_key' );
 		$default_method = strtoupper( (string) rgar( $feed['meta'], 'default_method' ) );
 
-		$catalog        = Addon::get_gateway_catalog();
-		$global_config  = Addon::get_methods_config();
-		$gateway_config = $global_config[ $gateway_key ] ?? [];
-		$available      = (array) ( $catalog[ $gateway_key ]['methods'] ?? [] );
+		$catalog       = Addon::get_gateway_catalog();
+		$keyed_catalog = Addon::get_keyed_method_catalog();
+
+		// Build the pool of available methods for this gateway.
+		// For dynamic gateways the static catalog has no methods; we skip the
+		// enabled-filter and let the backend decide what to show.
+		$is_dynamic = Addon::is_dynamic_gateway( $gateway_key );
+		$available  = (array) ( $catalog[ $gateway_key ]['methods'] ?? [] );
+
+		$methods_config_raw = rgar( $feed['meta'], 'methods_config' );
+		$methods_config     = is_string( $methods_config_raw )
+			? (array) json_decode( $methods_config_raw, true )
+			: (array) $methods_config_raw;
 
 		$enabled_methods = [];
-		foreach ( $available as $entity => $method ) {
-			$entity_key = strtoupper( (string) $entity );
-			if ( ! empty( $gateway_config[ $entity_key ]['enabled'] ) ) {
-				$enabled_methods[ $entity_key ] = $method;
+		if ( $is_dynamic ) {
+			// For dynamic gateways, any entity with an account chosen and enabled.
+			foreach ( $methods_config as $entity_key => $cfg ) {
+				$entity_key = strtoupper( (string) $entity_key );
+				if ( empty( $cfg['enabled'] ) || empty( $cfg['account'] ) ) {
+					continue;
+				}
+				$enabled_methods[ $entity_key ] = [
+					'method'  => $keyed_catalog[ $entity_key ]['label'] ?? $entity_key,
+					'account' => $cfg['account'],
+				];
+			}
+		} else {
+			foreach ( $available as $entity => $method ) {
+				$entity_key = strtoupper( (string) $entity );
+				if ( ! empty( $methods_config[ $entity_key ]['enabled'] ) ) {
+					$enabled_methods[ $entity_key ] = $method;
+				}
 			}
 		}
 
@@ -131,8 +154,11 @@ class GF_Field_Ifthenpay extends \GF_Field {
 					<div class="iftp-pbl-methods-title"><?php esc_html_e( 'Payment methods:', 'ifthenpay-payments-for-gravityforms' ); ?></div>
 					<div class="iftp-pbl-preview-methods">
 						<?php foreach ( $enabled_methods as $entity_key => $method ) :
-							$is_default = ( $entity_key === $default_method );
-							$logo_url   = 'https://gateway.ifthenpay.com/plugins/logotipos/small/' . strtolower( $entity_key ) . '.png';
+							$is_default  = ( $entity_key === $default_method );
+							$logo_url    = $keyed_catalog[ $entity_key ]['small_image_url'] ?? '';
+							if ( $logo_url === '' ) {
+								$logo_url = 'https://gateway.ifthenpay.com/plugins/logotipos/small/' . strtolower( $entity_key ) . '.png';
+							}
 							$label      = esc_attr( (string) ( $method['method'] ?? $entity_key ) );
 						?>
 						<span class="iftp-pbl-method-item<?php echo $is_default ? ' is-default' : ''; ?>" data-entity="<?php echo esc_attr( $entity_key ); ?>">

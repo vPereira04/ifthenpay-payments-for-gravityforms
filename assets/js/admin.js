@@ -99,31 +99,6 @@
 			});
 	});
 
-	$(document).on('change', '#iftp-gf-settings-gateway', function () {
-		const gatewayKey = $(this).val();
-
-		if (!gatewayKey) {
-			$('#iftp-gf-settings-methods-wrapper').html('');
-			return;
-		}
-
-		$.post(
-			ajaxurl,
-			{
-				action: 'iftp_gf_get_gateway_methods',
-				gateway_key: gatewayKey,
-				nonce: $('#iftp-gf-nonce').val(),
-			},
-			function (response) {
-				if (response.success) {
-					$('#iftp-gf-settings-methods-wrapper').html(
-						response.data.html
-					);
-				}
-			}
-		);
-	});
-
 	$(document).on('click', '#iftp-gf-disconnect-backoffice', function (e) {
 		e.preventDefault();
 		e.stopPropagation();
@@ -184,6 +159,54 @@
 	});
 
 	// -------------------------------------------------------------------------
+	// Default method dropdown — sync enabled/disabled state from checkboxes
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Enable options whose entity is checked, disable the rest.
+	 * The "Auto" option (value="") is always enabled.
+	 * Methods marked is-unavailable in the table can never be enabled.
+	 */
+	function syncDefaultMethodDropdown() {
+		const $select = $('[name="_gform_setting_default_method"]');
+		if (!$select.length) return;
+
+		// Build a map: entity → true (enabled) | false (disabled).
+		const enabled = {};
+		$('#iftp-gf-methods-table-wrapper .iftp-gf-method-toggle').each(function () {
+			const entity      = ($(this).data('entity') || '').toUpperCase();
+			const isChecked   = $(this).is(':checked');
+			const unavailable = $(this).closest('.iftp-gf-method-item').hasClass('is-unavailable');
+			enabled[entity]   = isChecked && !unavailable;
+		});
+
+		$select.find('option').each(function () {
+			const val = $(this).val();
+			if (val === '') return; // "Auto" always selectable
+			const entity = val.toUpperCase();
+			if (Object.prototype.hasOwnProperty.call(enabled, entity)) {
+				$(this).prop('disabled', !enabled[entity]);
+			}
+		});
+
+		// If the currently-selected value just became disabled, reset to Auto.
+		const current = $select.val();
+		if (
+			current !== '' &&
+			$select.find('option[value="' + current + '"]').prop('disabled')
+		) {
+			$select.val('');
+		}
+	}
+
+	// Re-sync whenever a method checkbox changes.
+	$(document).on(
+		'change',
+		'#iftp-gf-methods-table-wrapper .iftp-gf-method-toggle',
+		syncDefaultMethodDropdown
+	);
+
+	// -------------------------------------------------------------------------
 	// Feed settings page — gateway methods table
 	// -------------------------------------------------------------------------
 
@@ -200,6 +223,10 @@
 							'Select a gateway key to load methods.') +
 						'</p>'
 				);
+				// Clear the dropdown to just "Auto" when no gateway is selected.
+				updateDefaultMethodSelect('<option value="">' +
+					(strings.auto_method || '— Auto (first enabled method) —') +
+					'</option>');
 				return;
 			}
 
@@ -222,6 +249,13 @@
 				.done(function (res) {
 					if (res && res.success && res.data && res.data.html) {
 						$wrapper.html(res.data.html);
+
+						// Update the default-method dropdown options from the
+						// server-rendered HTML, then sync disabled states.
+						if (res.data.default_method_options) {
+							updateDefaultMethodSelect(res.data.default_method_options);
+						}
+						syncDefaultMethodDropdown();
 					} else {
 						$wrapper.html(
 							'<p class="iftp-gf-no-methods">No methods found for this gateway key.</p>'
@@ -235,6 +269,17 @@
 				});
 		},
 	};
+
+	/**
+	 * Replace all <option> elements inside the default_method <select>.
+	 * @param {string} optionsHtml  Raw HTML of <option> elements.
+	 */
+	function updateDefaultMethodSelect(optionsHtml) {
+		const $select = $('[name="_gform_setting_default_method"]');
+		if ($select.length) {
+			$select.html(optionsHtml);
+		}
+	}
 
 	window.iftpGfFeedSettings = iftpGfFeedSettings;
 
@@ -266,7 +311,7 @@
 		)
 			.done(function (res) {
 				if (res && res.success) {
-					$btn.closest('td').html(
+					$btn.closest('.iftp-gf-method-right').html(
 						'<em class="iftp-gf-activation-sent">' +
 							(strings.activation_sent || 'Request sent.') +
 							'</em>'
@@ -276,7 +321,7 @@
 						(res && res.data && res.data.message) ||
 						strings.activation_cooldown ||
 						'Request already sent.';
-					$btn.closest('td').html(
+					$btn.closest('.iftp-gf-method-right').html(
 						'<em class="iftp-gf-activation-cooldown">' +
 							msg +
 							'</em>'
@@ -294,5 +339,6 @@
 
 	$(function () {
 		syncKeyFieldVisibility();
+		syncDefaultMethodDropdown();
 	});
 })(jQuery);

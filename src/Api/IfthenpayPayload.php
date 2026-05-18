@@ -231,6 +231,9 @@ final class IfthenpayPayload {
 	}
 
 	/**
+	 * Reads the stored method catalog (now entity-keyed) and returns a list
+	 * compatible with the Position-based selected_method logic.
+	 *
 	 * @return array<int, array<string, mixed>>
 	 */
 	private static function get_available_methods_from_database(): array {
@@ -241,13 +244,25 @@ final class IfthenpayPayload {
 		}
 
 		$methods = [];
-		foreach ( $catalog as $method ) {
-			if ( ! is_array( $method ) || empty( $method['entity'] ) ) {
+
+		foreach ( $catalog as $entity_key => $data ) {
+			if ( ! is_array( $data ) ) {
 				continue;
 			}
+
+			// New format: catalog is keyed by entity string.
+			// Old list format had numeric keys — support both during transition.
+			$entity   = is_string( $entity_key ) && ! is_numeric( $entity_key )
+				? strtoupper( $entity_key )
+				: strtoupper( (string) ( $data['entity'] ?? '' ) );
+
+			if ( $entity === '' ) {
+				continue;
+			}
+
 			$methods[] = [
-				'Entity'   => strtoupper( (string) $method['entity'] ),
-				'Position' => (string) ( $method['position'] ?? 0 ),
+				'Entity'   => $entity,
+				'Position' => (string) ( $data['position'] ?? 0 ),
 			];
 		}
 

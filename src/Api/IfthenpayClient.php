@@ -15,10 +15,48 @@ final class IfthenpayClient {
 	private const API_BASE    = 'https://api.ifthenpay.com';
 	private const MOBILE_BASE = 'https://ifthenpay.com/IfmbWS/ifthenpaymobile.asmx';
 
+	/** Transient key for the raw /gateway/methods/available response. */
+	private const AVAIL_METHODS_TRANSIENT = 'iftp_gf_avail_methods';
+
+	/** TTL for the available-methods transient: 6 hours. */
+	private const AVAIL_METHODS_TTL = 21600;
+
 	private string $backoffice_key;
 
 	public function __construct( string $backoffice_key ) {
 		$this->backoffice_key = sanitize_text_field( $backoffice_key );
+	}
+
+	// -------------------------------------------------------------------------
+	// Available methods (global catalog) — with 6-hour transient cache
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Returns the raw /gateway/methods/available data, served from a 6-hour
+	 * transient so we stay in sync with IsVisible changes without hammering the API.
+	 */
+	public static function get_cached_available_methods(): array {
+		$cached = get_transient( self::AVAIL_METHODS_TRANSIENT );
+		if ( is_array( $cached ) && ! empty( $cached ) ) {
+			return $cached;
+		}
+
+		try {
+			$methods = self::get_available_methods();
+		} catch ( \Throwable ) {
+			return [];
+		}
+
+		if ( ! empty( $methods ) ) {
+			set_transient( self::AVAIL_METHODS_TRANSIENT, $methods, self::AVAIL_METHODS_TTL );
+		}
+
+		return $methods;
+	}
+
+	/** Force-expire the available-methods transient (call after reconnect). */
+	public static function bust_available_methods_cache(): void {
+		delete_transient( self::AVAIL_METHODS_TRANSIENT );
 	}
 
 	public static function validate_backoffice_key( string $backoffice_key ): bool {
@@ -42,28 +80,61 @@ final class IfthenpayClient {
 		return self::request( 'GET', self::API_BASE . '/gateway/methods/available' );
 	}
 
+	// -------------------------------------------------------------------------
+	// Method catalog builder
+	// -------------------------------------------------------------------------
+
 	/**
+	 * Builds the method catalog from a raw /gateway/methods/available response.
+	 *
+	 * Returns an associative array keyed by uppercase entity code, e.g.:
+	 *   'MB' => [
+	 *     'entity'                => 'MB',
+	 *     'label'                 => 'MULTIBANCO',
+	 *     'small_image_url'       => 'https://...',
+	 *     'small_image_url_dark'  => 'https://...',
+	 *     'image_url'             => 'https://...',
+	 *     'position'              => 1,
+	 *     'is_visible'            => true,
+	 *     'allow_selected_method' => true,
+	 *   ]
+	 *
+	 * All methods are included regardless of IsVisible so that visibility
+	 * changes are reflected at render time from the live cache.
+	 *
 	 * @param array<int, array<string, mixed>> $rawMethods
-	 * @return array<int, array<string, string>>
+	 * @return array<string, array<string, mixed>>
 	 */
 	public static function build_method_catalog_from_raw( array $rawMethods ): array {
 		$catalog = [];
+
 		foreach ( $rawMethods as $method ) {
-			if ( ! is_array( $method ) || empty( $method['Entity'] ) || empty( $method['IsVisible'] ) ) {
+			if ( ! is_array( $method ) || empty( $method['Entity'] ) ) {
 				continue;
 			}
-			$catalog[] = [
-				'entity'   => strtoupper( (string) $method['Entity'] ),
-				'label'    => isset( $method['Method'] ) ? (string) $method['Method'] : (string) $method['Entity'],
-				'logo'     => isset( $method['SmallImageUrl'] ) ? (string) $method['SmallImageUrl'] : '',
-				'position' => (int) ( $method['Position'] ?? 0 ),
+
+			$entity = strtoupper( (string) $method['Entity'] );
+
+			$catalog[ $entity ] = [
+				'entity'                => $entity,
+				'label'                 => (string) ( $method['Method'] ?? $entity ),
+				'small_image_url'       => (string) ( $method['SmallImageUrl'] ?? '' ),
+				'small_image_url_dark'  => (string) ( $method['SmallImageUrlDark'] ?? '' ),
+				'image_url'             => (string) ( $method['ImageUrl'] ?? '' ),
+				'position'              => (int) ( $method['Position'] ?? 0 ),
+				'is_visible'            => (bool) ( $method['IsVisible'] ?? false ),
+				'allow_selected_method' => (bool) ( $method['AllowSelectedMethod'] ?? false ),
 			];
 		}
+
+		// Sort by position ascending.
+		uasort( $catalog, static fn( array $a, array $b ): int => $a['position'] <=> $b['position'] );
+
 		return $catalog;
 	}
 
 	/**
-	 * @return array<int, array<string, string>>
+	 * @return array<string, array<string, mixed>>
 	 */
 	public static function get_method_catalog(): array {
 		try {
@@ -73,16 +144,19 @@ final class IfthenpayClient {
 		}
 	}
 
+	// -------------------------------------------------------------------------
+	// Gateway catalog builder
+	// -------------------------------------------------------------------------
+
 	/**
-	 * @param array<string, mixed> $row
-	 * @param array<int, array<string, mixed>> $available_methods
+	 * @param array<int, array<string, mixed>> $rawMethods
 	 * @return array<string, array<string, mixed>>
 	 */
 	private static function build_gateway_method_accounts( array $row, array $available_methods ): array {
 		$methods = [];
 
 		foreach ( $available_methods as $method ) {
-			if ( empty( $method['IsVisible'] ) || empty( $method['Method'] ) ) {
+			if ( empty( $method['Method'] ) ) {
 				continue;
 			}
 
@@ -96,11 +170,12 @@ final class IfthenpayClient {
 				continue;
 			}
 
+			// Store the account even if IsVisible=false — visibility is checked
+			// at render time against the live method catalog (refreshed every 6 h).
 			$methods[ $key ] = [
-				'method'     => $method['Method'],
-				'entity'     => $key,
-				'account'    => $value,
-				'is_visible' => (bool) $method['IsVisible'],
+				'method'  => $method['Method'],
+				'entity'  => $key,
+				'account' => $value,
 			];
 		}
 
@@ -184,10 +259,14 @@ final class IfthenpayClient {
 		$rows = $this->get_gateway_keys( '' );
 
 		if ( empty( $rawMethods ) ) {
-			try {
-				$rawMethods = self::get_available_methods();
-			} catch ( RuntimeException ) {
-				$rawMethods = [];
+			// Use cached available methods to avoid an extra API call.
+			$rawMethods = self::get_cached_available_methods();
+			if ( empty( $rawMethods ) ) {
+				try {
+					$rawMethods = self::get_available_methods();
+				} catch ( RuntimeException ) {
+					$rawMethods = [];
+				}
 			}
 		}
 
@@ -208,6 +287,7 @@ final class IfthenpayClient {
 				'gateway_key' => $key,
 				'alias'       => $alias,
 				'label'       => $alias !== '' ? $alias : $key,
+				'tipo'        => sanitize_text_field( (string) ( $row['Tipo'] ?? '' ) ),
 				'methods'     => self::build_gateway_method_accounts( $row, $rawMethods ),
 			];
 		}
@@ -225,6 +305,37 @@ final class IfthenpayClient {
 		);
 
 		return self::request( 'GET', $url );
+	}
+
+	/**
+	 * Parses the raw GetAccountsByGatewayKey response into a keyed structure:
+	 * [ 'ENTITY' => [ ['label' => alias, 'account' => conta], ... ], ... ]
+	 * Numeric Entidade values are normalised to 'MB'.
+	 */
+	public static function parse_dynamic_accounts( array $raw ): array {
+		$result = [];
+
+		foreach ( $raw as $acct ) {
+			if ( empty( $acct['Alias'] ) || empty( $acct['Conta'] ) ) {
+				continue;
+			}
+
+			$raw_entity = (string) ( $acct['Entidade'] ?? '' );
+			$entity     = ( $raw_entity !== '' && ! is_numeric( $raw_entity ) )
+				? strtoupper( $raw_entity )
+				: 'MB';
+
+			if ( ! isset( $result[ $entity ] ) ) {
+				$result[ $entity ] = [];
+			}
+
+			$result[ $entity ][] = [
+				'label'   => sanitize_text_field( (string) $acct['Alias'] ),
+				'account' => sanitize_text_field( (string) $acct['Conta'] ),
+			];
+		}
+
+		return $result;
 	}
 
 	public static function get_payment_method_by_transaction_id( string $transaction_id ): array {

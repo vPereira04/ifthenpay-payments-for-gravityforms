@@ -4,16 +4,17 @@
    Backoffice key row (plugin settings page)
    ------------------------------------------------------------------------- */
 
-.iftp-gf-key-field-hidden {
-    display: none;
-}
-
 .iftp-gf-key-row {
     margin: 6px 0 14px;
     display: flex;
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
+}
+
+/* Specificity 0,2,0 beats .iftp-gf-key-row's display:flex (0,1,0) */
+.iftp-gf-key-row.iftp-gf-key-field-hidden {
+    display: none;
 }
 
 /* Inline feedback message */
@@ -32,7 +33,7 @@
 }
 
 /* -------------------------------------------------------------------------
-   Payment methods table (feed settings)
+   Global gateways overview table (plugin settings page)
    ------------------------------------------------------------------------- */
 
 .iftp-gf-methods-table {
@@ -63,22 +64,148 @@
     border-bottom: none;
 }
 
-.iftp-gf-methods-table .iftp-gf-account-col code {
+/* -------------------------------------------------------------------------
+   Payment methods list (feed settings page)
+   ------------------------------------------------------------------------- */
+
+.iftp-gf-methods-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-width: 600px;
+    margin-top: 4px;
+}
+
+.iftp-gf-method-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    border: 1px solid #dcdcde;
+    border-radius: 3px;
+    background: #fff;
+    transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.iftp-gf-method-item:hover {
+    border-color: #8c8f94;
+}
+
+.iftp-gf-method-item.is-enabled {
+    border-color: #2271b1;
+    background: #f0f6fc;
+}
+
+/* IsVisible=false from the API — shown but locked out */
+.iftp-gf-method-item.is-unavailable {
+    opacity: 0.55;
+    pointer-events: none;
+    border-color: #dcdcde;
+    background: #f6f7f7;
+}
+
+.iftp-gf-unavailable-badge {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #8c8f94;
+    background: #f0f0f1;
+    border: 1px solid #dcdcde;
+    border-radius: 2px;
+    padding: 1px 5px;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+/* Grayed-out disabled options in the default method dropdown */
+select option:disabled {
+    color: #a7aaad;
+}
+
+.iftp-gf-method-item-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    flex: 1;
+    min-width: 0;
+}
+
+.iftp-gf-method-item-label input[type="checkbox"] {
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.iftp-gf-method-icon-wrap {
+    width: 72px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px;
+    flex-shrink: 0;
+    border-right: 1px solid #e5e7eb;
+    margin-right: 6px;
+}
+
+/* is-wide is kept for backwards compat but no longer changes the size */
+.iftp-gf-method-icon-wrap.is-wide {
+    width: 72px;
+}
+
+.iftp-gf-method-icon-wrap img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.iftp-gf-method-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #1d2327;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.iftp-gf-method-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.iftp-gf-account-code {
     font-size: 11px;
     background: #f6f7f7;
     padding: 2px 6px;
     border-radius: 3px;
+    color: #50575e;
 }
 
 .iftp-gf-no-account {
     color: #8c8f94;
     font-size: 12px;
+    font-style: italic;
 }
 
 .iftp-gf-active-badge {
     color: #166534;
     font-size: 16px;
     font-weight: bold;
+    line-height: 1;
+}
+
+.iftp-gf-method-account-select {
+    font-size: 11px;
+    padding: 3px 4px;
+    border: 1px solid #dcdcde;
+    border-radius: 3px;
+    background: #fff;
+    color: #1d2327;
+    width: 160px;
 }
 
 .iftp-gf-activation-sent,
@@ -105,10 +232,25 @@
     margin: 8px 0;
 }
 
-.ifthenpay-icon {
+/* -------------------------------------------------------------------------
+   Icons
+   ------------------------------------------------------------------------- */
+
+.gform-icon--ifthenpay::before{
+    content: "";
+    display: inline-block;
+    width: 24px;
+    height: 23px;
+    background-image: url('../images/ifthenpay-icon.svg');
+    background-size: contain;
+    background-repeat: no-repeat;
+}
+
+
+.ifthenpay-small-icon {
     display: inline-block;
     width: 20px;
     height: 20px;
     background-color: currentcolor;
-    mask: url('../images/ifthenpay-icon.svg') no-repeat center / contain;
+    mask: url('../images/ifthenpay-small-icon.svg') no-repeat center / contain;
 }

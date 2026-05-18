@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Plugin Name:       Gravity Forms Ifthenpay Add-On
+ * Plugin Name:       Ifthenpay | Payments for GravityForms
  * Plugin URI:        https://ifthenpay.com
  * Description:       ifthenpay Pay by Link integration for Gravity Forms.
  * Version:           1.0.0

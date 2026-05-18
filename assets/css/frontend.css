@@ -205,9 +205,9 @@
 }
 
 .iftp-pbl-status.is-visible { display: block; }
-.iftp-pbl-status.is-success { background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; }
-.iftp-pbl-status.is-error   { background: #fdecea; color: #b71c1c; border: 1px solid #f5c6cb; }
-.iftp-pbl-status.is-info    { background: #e3f2fd; color: #0d47a1; border: 1px solid #90caf9; }
+.iftp-pbl-status.is-success { color: #1b5e20; }
+.iftp-pbl-status.is-error   { background: #fdecea;}
+.iftp-pbl-status.is-info    { border: 1px solid #90caf9; }
 
 .iftp-pbl-runtime-warning {
 	margin-top: 10px;
