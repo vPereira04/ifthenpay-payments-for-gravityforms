@@ -38,7 +38,7 @@ final class IfthenpayPayload {
 	}
 
 	/**
-	 * Default Pay-By-Link expiry: 24 hours from now, formatted as YYYYMMDD. 
+	 * Default Pay-By-Link expiry: 24 hours from now, formatted as YYYYMMDD.
 	 */
 	public static function default_expiredate( int $days_from_now = 1 ): string {
 		return gmdate( 'Ymd', time() + ( max( 1, $days_from_now ) * DAY_IN_SECONDS ) );

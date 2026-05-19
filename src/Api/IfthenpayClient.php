@@ -28,7 +28,7 @@ final class IfthenpayClient {
 	}
 
 	// -------------------------------------------------------------------------
-	// Available methods (global catalog) — with 6-hour transient cache 
+	// Available methods (global catalog) — with 6-hour transient cache
 	// -------------------------------------------------------------------------
 
 	/**

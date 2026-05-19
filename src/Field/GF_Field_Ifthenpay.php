@@ -46,7 +46,7 @@ class GF_Field_Ifthenpay extends \GF_Field {
 	}
 
 	// -------------------------------------------------------------------------
-	// Field rendering — passive preview only (no payment UI). 
+	// Field rendering — passive preview only (no payment UI).
 	// After form submit, GFPaymentAddOn::redirect_url() sends the user to the
 	// ifthenpay payment page. Same flow as MemberPress / GF Stripe checkout.
 	// -------------------------------------------------------------------------

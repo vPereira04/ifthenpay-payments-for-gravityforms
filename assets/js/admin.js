@@ -9,7 +9,7 @@
 	const nonce = strings.nonce || '';
 
 	// -------------------------------------------------------------------------
-	// Plugin settings page — backoffice key connect / disconnect 
+	// Plugin settings page — backoffice key connect / disconnect
 	// -------------------------------------------------------------------------
 
 	function getKeyInput() {

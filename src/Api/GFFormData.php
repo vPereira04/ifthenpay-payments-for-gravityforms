@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Gravity Forms-specific helpers for resolving form amounts and customer data. 
+ * Gravity Forms-specific helpers for resolving form amounts and customer data.
  */
 final class GFFormData {
 

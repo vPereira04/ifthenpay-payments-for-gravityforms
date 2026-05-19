@@ -19,7 +19,6 @@
  * orbital) because --gf-ctrl-padding-y is 0 in orbital (inputs are sized via
  * --gf-ctrl-size, not padding-y, so reusing it would flatten our card).
  * Each fallback matches the legacy 2.5 theme look.
- *
  */
 .iftp-pbl-public-box {
 	max-width: 100%;

@@ -30,7 +30,7 @@ final class IfthenpayReturn {
 	}
 
 	/**
-	 * Resolve the normalized payment return context from GF gateway return params. 
+	 * Resolve the normalized payment return context from GF gateway return params.
 	 *
 	 * @param array<string, mixed> $return_data
 	 * @return array{transaction_id: string, payment_method: string, successful: bool}

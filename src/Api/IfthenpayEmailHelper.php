@@ -25,7 +25,7 @@ final class IfthenpayEmailHelper {
 	 *   wp_version: string,
 	 *   gf_version: string,
 	 *   plugin_version: string
-	 * } $data 
+	 * } $data
 	 */
 	public static function send_activation_email( array $data ): bool {
 		$entity    = strtoupper( sanitize_text_field( $data['entity'] ?? '' ) );

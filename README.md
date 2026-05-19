@@ -2,6 +2,13 @@
 
 Adds ifthenpay payment methods to GravityForms: cards, wallets, and local payment options; supports secure one-time payments via pay-by-link.
 
+<p align="left">
+  <img src="https://img.shields.io/badge/WordPress-6.5+-21759B?logo=wordpress&logoColor=white" alt="WordPress">
+  <img src="https://img.shields.io/badge/PHP-8.2+-777BB4?logo=php&logoColor=white" alt="PHP">
+  <img src="https://img.shields.io/badge/GravityForms-Compatible-orange" alt="GravityForms">
+  <img src="https://img.shields.io/badge/Secure-No%20Card%20Storage-success" alt="Secure">
+</p>
+
 ---
 
 ## Table of Contents
@@ -16,89 +23,237 @@ Adds ifthenpay payment methods to GravityForms: cards, wallets, and local paymen
 - [Screenshots](#screenshots)
 - [Support](#support)
 
+---
+
 ## Description
 
-This plugin integrates the ifthenpay payment gateway with GravityForms to enable seamless payment collection directly from your forms. Payments are processed through a secure pay-by-link system, ensuring that no sensitive card or banking data is stored on your website. Customers can complete payments using their preferred method via a secure payment page. After submitting a form, users are redirected to the payment window where they complete the transaction; ifthenpay then sends a server-side callback to update the payment status automatically.
+This plugin integrates the ifthenpay payment gateway with GravityForms to enable seamless payment collection directly from your forms.
+
+Payments are processed through a secure pay-by-link system, ensuring that no sensitive card or banking data is stored on your website.
+
+Customers complete payments using their preferred payment method through a secure payment page. After form submission, users are redirected to the payment window where they finalize the transaction. ifthenpay then sends a server-side callback to automatically update the payment status inside GravityForms.
+
+### Payment Flow
+
+```text
+Customer fills form
+        ↓
+Form submitted
+        ↓
+Secure ifthenpay payment page
+        ↓
+Customer completes payment
+        ↓
+Automatic payment confirmation
+        ↓
+GravityForms entry updated
+````
 
 ### In plain terms you get:
 
-- One-time payments directly from GravityForms
-- Support for coupons and automatic total calculations
-- Merchant backoffice (basic sales) on web + mobile
-- Secure automatic payment confirmations (no card numbers stored)
+* One-time payments directly from GravityForms
+* Support for coupons and automatic total calculations
+* Merchant backoffice (basic sales) on web + mobile
+* Secure automatic payment confirmations
+* No card numbers stored on your website
 
-All settings are made in GravityForms and in your ifthenpay Backoffice. The plugin is built so site owners can manage payments without needing deep technical knowledge.
+All settings are configured directly in GravityForms and the ifthenpay Backoffice. The plugin is designed so site owners can manage payments without requiring deep technical knowledge.
+
+---
 
 ## Key Features
 
-1. Full integration with GravityForms payment flow
-2. Secure transactions
-3. Automatic payment confirmation
-4. Support for multiple payment methods (cards, wallets, transfers)
-6. Real-time payment status in GravityForms entries
-7. Multi-language support (EN, ES, FR, PT)
-8. Security first (no card data stored)
+| Feature                  | Description                                             |
+| ------------------------ | ------------------------------------------------------- |
+| GravityForms Integration | Full integration with the GravityForms payment flow     |
+| Secure Transactions      | Payments processed securely through ifthenpay           |
+| Automatic Confirmation   | Payment status updates automatically via callback       |
+| Multiple Payment Methods | Cards, wallets, and local payment options               |
+| Real-Time Status         | Payment status visible directly in GravityForms entries |
+| Multi-Language Support   | EN, ES, FR, PT                                          |
+| Security First           | No sensitive payment data stored                        |
+
+---
 
 ## Requirements
 
-- An active ifthenpay merchant account — [subscribe here](https://ifthenpay.com/aderir/) to obtain your credentials.
-- The payment methods you want enabled (our helpdesk team will guide you).
-- WordPress 6.5+ and PHP 8.2+, and GravityForms installed and activated.
-- HTTPS (SSL) enabled on your site.
+Before getting started, make sure you have:
+
+* An active ifthenpay merchant account — [subscribe here](https://ifthenpay.com/aderir/) to obtain your credentials.
+* The payment methods you want enabled (our helpdesk team will guide you).
+* WordPress 6.5+.
+* PHP 8.2+.
+* GravityForms installed and activated.
+* HTTPS (SSL) enabled on your site.
+
+> **Tip:** If your site still does not use HTTPS, now is probably a good time.
+
+---
 
 ## Installation
 
-1. **Install:** Upload the plugin zip via `Plugins → Add New → Upload`, or install from WordPress.org and Activate.
-2. **Credentials:** Ensure your ifthenpay account has an active GravityForms Gateway Key with the desired payment methods enabled.
-3. **Setup:** Go to `GravityForms → Settings → Ifthenpay` and enter your Backoffice Key.
-4. **Form config:** `Create/Edit a form → Settings → Ifthenpay → "Add New" Feed` and select a Gateway Key. Next, choose which payment methods to activate from those available in your gateway, and set your default payment method. Finally, add a payment description, which will be displayed on the ifthenpay payment page for all transactions.
+### 1. Install the Plugin
+
+Upload the plugin ZIP via:
+
+```text
+Plugins → Add New → Upload Plugin
+```
+
+Or install it directly from WordPress.org and activate it.
+
+
+
+### 2. Configure Credentials
+
+Ensure your ifthenpay account has:
+
+* An active GravityForms Gateway Key
+* The desired payment methods enabled
+
+Then navigate to:
+
+```text
+GravityForms → Settings → Ifthenpay
+```
+
+And enter your Backoffice Key.
+
+---
+
+## Form Setup
+
+To configure payments for a form:
+
+```text
+Create/Edit Form
+→ Settings
+→ Ifthenpay
+→ Add New Feed
+```
+
+Then:
+
+1. Select a Gateway Key
+2. Choose which payment methods to enable
+3. Define the default payment method
+4. Add a payment description
+
+The payment description will be displayed on the ifthenpay payment page for customers during checkout.
+
+> Example of a good description:
+>
+> `Event Registration Payment`
+>
+> Example of a less ideal description:
+>
+> `test payment pls ignore`
+
+---
 
 ## Frequently Asked Questions
 
 <details>
 <summary><strong>Does this plugin require GravityForms?</strong></summary>
+
 Yes. GravityForms must be installed and active to use this plugin.
+
+Without GravityForms, this plugin becomes useless...
+
 </details>
+
+---
 
 <details>
 <summary><strong>Does it support recurring payments?</strong></summary>
-No. This version supports only one-time payments via pay-by-link.
+
+No. This version supports one-time payments via pay-by-link only.
+
 </details>
+
+---
 
 <details>
 <summary><strong>Are payment details stored?</strong></summary>
-No. The plugin does not store card numbers or full bank details. Only minimal references required for payment matching are kept.
+
+No. The plugin does not store card numbers or full bank details.
+
+Only the minimal references required for payment matching and status updates are stored.
+
 </details>
+
+---
 
 <details>
 <summary><strong>Which payment methods are supported?</strong></summary>
-Any ifthenpay method attached to your Gateway Key (e.g. Multibanco, MB WAY, Payshop, Credit Card, Cofidis, Google Pay, Apple Pay, Pix).
+
+Any ifthenpay method attached to your Gateway Key, including:
+
+* Multibanco
+* MB WAY
+* Payshop
+* Credit Card
+* Cofidis
+* Google Pay
+* Apple Pay
+* Pix
+
 </details>
+
+---
 
 <details>
 <summary><strong>How does the payment process work?</strong></summary>
-After form submission, users are presented with a secure payment page. Once payment is completed, the status is updated automatically via callback.
+
+After form submission, users are redirected to a secure payment page hosted by ifthenpay.
+
+Once payment is completed, the payment status is updated automatically via callback.
+
 </details>
+
+---
 
 <details>
 <summary><strong>What happens if a payment fails?</strong></summary>
-The entry is marked as Failed. Users can retry the payment depending on your configuration.
+
+The GravityForms entry is marked as Failed.
+
+Depending on your configuration, users may retry the payment.
+
 </details>
+
+---
 
 <details>
 <summary><strong>Can I customize the payment experience?</strong></summary>
-Yes. You can configure display mode, button label, description, and styling within GravityForms.
+
+Yes. You can configure display mode, button labels, descriptions, and styling options directly within GravityForms.
+
 </details>
+
+---
 
 <details>
 <summary><strong>Is there a sandbox?</strong></summary>
-ifthenpay may provide test entities; if unavailable, use a low-value live test.
+
+ifthenpay may provide test entities for development and testing purposes.
+
+If unavailable, we recommend using a low-value live transaction.
+
+Maybe not your largest transaction on the first attempt.
+
 </details>
+
+---
 
 <details>
 <summary><strong>How secure is the integration?</strong></summary>
-Requests are encrypted over HTTPS; no sensitive payment data is stored.
+
+All requests are encrypted over HTTPS and no sensitive payment data is stored on your website.
+
 </details>
+
+---
 
 ## External Services
 
@@ -128,6 +283,8 @@ Below are screenshots demonstrating key features and interfaces of the plugin:
 4. **(Customers Experience) Payment Gateway field display varies by GravityForms settings**
 5. **(Customers Experience) Payment Window**
 6. **(Customers Experience) Successful Payment**
+
+---
 
 ## Support
 

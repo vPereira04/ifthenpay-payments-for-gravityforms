@@ -15,7 +15,7 @@ declare(strict_types=1);
  * License:           GPL v3
  * License URI:       https://www.gnu.org/licenses/gpl-3.0.html
  * Text Domain:       ifthenpay-payments-for-gravityforms
- * Domain Path:       /languages 
+ * Domain Path:       /languages
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
