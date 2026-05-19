@@ -18,7 +18,7 @@ Adds ifthenpay payment methods to GravityForms: cards, wallets, and local paymen
 
 ## Description
 
-This plugin integrates the ifthenpay payment gateway with GravityForms to enable seamless payment collection directly from your forms. Payments are processed through a secure pay-by-link system, ensuring that no sensitive card or banking data is stored on your website. Customers can complete payments using their preferred method via a secure payment page. After submitting a form, users are shown a payment interface (modal or popup) where they complete the transaction; ifthenpay then sends a server-side callback to update the payment status automatically.
+This plugin integrates the ifthenpay payment gateway with GravityForms to enable seamless payment collection directly from your forms. Payments are processed through a secure pay-by-link system, ensuring that no sensitive card or banking data is stored on your website. Customers can complete payments using their preferred method via a secure payment page. After submitting a form, users are redirected to the payment window where they complete the transaction; ifthenpay then sends a server-side callback to update the payment status automatically.
 
 ### In plain terms you get:
 
@@ -31,21 +31,18 @@ All settings are made in GravityForms and in your ifthenpay Backoffice. The plug
 
 ## Key Features
 
-1. Full integration with GravityForms Lite and Pro payment flow
+1. Full integration with GravityForms payment flow
 2. Secure transactions
 3. Automatic payment confirmation
 4. Support for multiple payment methods (cards, wallets, transfers)
-5. Coupon and discount support via GravityForms
-6. Modal or popup payment display modes
-7. Real-time payment status in GravityForms entries
-8. Multi-language support (EN, ES, FR, PT)
-9. Security first (no card data stored)
+6. Real-time payment status in GravityForms entries
+7. Multi-language support (EN, ES, FR, PT)
+8. Security first (no card data stored)
 
 ## Requirements
 
 - An active ifthenpay merchant account — [subscribe here](https://ifthenpay.com/aderir/) to obtain your credentials.
-- A GravityForms Gateway Key (request this from ifthenpay support/helpdesk).
-- The payment methods you want enabled on that Gateway Key (our helpdesk team will guide you).
+- The payment methods you want enabled (our helpdesk team will guide you).
 - WordPress 6.5+ and PHP 8.2+, and GravityForms installed and activated.
 - HTTPS (SSL) enabled on your site.
 
@@ -74,18 +71,13 @@ No. The plugin does not store card numbers or full bank details. Only minimal re
 </details>
 
 <details>
-<summary><strong>Does it support GravityForms coupons?</strong></summary>
-Yes. GravityForms coupon fields are fully supported and discounts are automatically calculated.
-</details>
-
-<details>
 <summary><strong>Which payment methods are supported?</strong></summary>
 Any ifthenpay method attached to your Gateway Key (e.g. Multibanco, MB WAY, Payshop, Credit Card, Cofidis, Google Pay, Apple Pay, Pix).
 </details>
 
 <details>
 <summary><strong>How does the payment process work?</strong></summary>
-After form submission, users are presented with a secure payment page (modal or popup). Once payment is completed, the status is updated automatically via callback.
+After form submission, users are presented with a secure payment page. Once payment is completed, the status is updated automatically via callback.
 </details>
 
 <details>
@@ -133,10 +125,9 @@ Below are screenshots demonstrating key features and interfaces of the plugin:
 1. **(Admin Only) Backoffice Synchronization under GravityForms Settings Payments**
 2. **(Admin Only) GravityForms's admin page (Creation/Editing Form -> Payments)**
 3. **(Admin Only) Adding ifthenpay's Payment field to the selected form**
-4. **(Admin Only) ifthenpay's Payment field Basic configuration options**
-5. **(Admin Only) ifthenpay's Payment field Advanced configuration options**
-6. **(Customers Experience) Payment Gateway field display varies by GravityForms settings**
-7. **(Customers Experience) Payment Modal Window**
+4. **(Customers Experience) Payment Gateway field display varies by GravityForms settings**
+5. **(Customers Experience) Payment Window**
+6. **(Customers Experience) Successful Payment**
 
 ## Support
 

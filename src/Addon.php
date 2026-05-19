@@ -94,6 +94,25 @@ class Addon extends \GFPaymentAddOn {
 		parent::init_admin();
 		$this->load_catalogs_if_empty();
 		add_action( 'admin_notices', [ $this, 'render_admin_notices' ] );
+
+		// The block editor (Gutenberg) renders the GF form-preview block inside
+		// an iframe that doesn't inherit the addon-framework enqueue chain. Push
+		// our frontend stylesheet in via the block-editor-assets hook so the
+		// passive preview is themed correctly inside the editor canvas.
+		add_action( 'enqueue_block_editor_assets', [ $this, 'enqueue_block_editor_styles' ] );
+	}
+
+	/**
+	 * Loads the field stylesheet into the Gutenberg block-editor iframe so the
+	 * GF form-block preview matches the front-end look.
+	 */
+	public function enqueue_block_editor_styles(): void {
+		wp_enqueue_style(
+			'ifthenpay-gf-frontend',
+			IFTP_GF_URL . 'assets/css/frontend.css',
+			[],
+			IFTP_GF_VERSION
+		);
 	}
 
 	public function init_ajax(): void {
@@ -281,7 +300,8 @@ class Addon extends \GFPaymentAddOn {
 		$html = ob_get_clean();
 
 		if ( $echo ) {
-			echo self::kses_admin_html( $html );
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Sanitized via static kses_admin_html().
+			echo $this->kses_admin_html( $html );
 		}
 
 		return $html;
@@ -439,7 +459,8 @@ class Addon extends \GFPaymentAddOn {
 		$html = ob_get_clean();
 
 		if ( $echo ) {
-			echo self::kses_admin_html( $html );
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Sanitized via static kses_admin_html().
+			echo $this->kses_admin_html( $html );
 		}
 
 		return $html;
@@ -623,7 +644,8 @@ class Addon extends \GFPaymentAddOn {
 		$html = ob_get_clean();
 
 		if ( $echo ) {
-			echo self::kses_admin_html( $html );
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Sanitized via static kses_admin_html().
+			echo $this->kses_admin_html( $html );
 		}
 
 		return $html;
@@ -891,10 +913,6 @@ class Addon extends \GFPaymentAddOn {
 		$form_id  = (int) rgar( $form, 'id' );
 		$entry_id = (int) rgar( $entry, 'id' );
 
-		// Entry point trace — always hits debug.log when WP_DEBUG_LOG is on,
-		// regardless of whether GF Logging add-on is installed.
-		error_log( sprintf( '[ifthenpay-gf] redirect_url() called — entry=%d form=%d amount=%s', $entry_id, $form_id, $submission_data['payment_amount'] ?? 'unset' ) );
-
 		// Refuse to process if another payment add-on also has an active feed on this form.
 		$competing = $this->get_competing_payment_addon_slugs( $form_id );
 		if ( ! empty( $competing ) ) {
@@ -910,7 +928,6 @@ class Addon extends \GFPaymentAddOn {
 		$backoffice_key = self::get_backoffice_key();
 		if ( $backoffice_key === '' ) {
 			$this->log_error( __METHOD__ . '(): No backoffice key configured.' );
-			error_log( '[ifthenpay-gf] redirect_url() aborted — no backoffice key configured.' );
 			return '';
 		}
 
@@ -919,21 +936,18 @@ class Addon extends \GFPaymentAddOn {
 		$gateway_key = (string) ( $form_info['gateway_key'] ?? '' );
 		if ( $gateway_key === '' ) {
 			$this->log_error( __METHOD__ . '(): No gateway key in form info.' );
-			error_log( "[ifthenpay-gf] redirect_url() aborted — form_info for form #{$form_id} has no gateway_key. Re-save the feed." );
 			return '';
 		}
 
 		$amount = (float) ( $submission_data['payment_amount'] ?? 0 );
 		if ( $amount <= 0 ) {
 			$this->log_error( __METHOD__ . '(): Payment amount is 0.' );
-			error_log( "[ifthenpay-gf] redirect_url() aborted — payment_amount is 0 for form #{$form_id}." );
 			return '';
 		}
 
 		$enabled_methods = (array) ( $form_info['enabled_methods'] ?? [] );
 		if ( empty( $enabled_methods ) ) {
 			$this->log_error( __METHOD__ . '(): No enabled methods for form #' . $form_id );
-			error_log( "[ifthenpay-gf] redirect_url() aborted — form_info has no enabled_methods for form #{$form_id}. Re-save the feed." );
 			return '';
 		}
 
@@ -949,7 +963,6 @@ class Addon extends \GFPaymentAddOn {
 
 		if ( $accounts === '' ) {
 			$this->log_error( __METHOD__ . '(): Empty accounts string for form #' . $form_id );
-			error_log( "[ifthenpay-gf] redirect_url() — empty accounts string for form #{$form_id}; aborting." );
 			return '';
 		}
 
@@ -998,7 +1011,6 @@ class Addon extends \GFPaymentAddOn {
 			$response = IfthenpayClient::create_payment_link( $gateway_key, $payload );
 		} catch ( \RuntimeException $e ) {
 			$this->log_error( __METHOD__ . '(): API error — ' . $e->getMessage() );
-			error_log( '[ifthenpay-gf] redirect_url() API error: ' . $e->getMessage() );
 			return '';
 		}
 
@@ -1030,7 +1042,6 @@ class Addon extends \GFPaymentAddOn {
 
 		if ( $redirect_url === '' ) {
 			$this->log_error( __METHOD__ . '(): Empty redirect URL in API response.' );
-			error_log( '[ifthenpay-gf] redirect_url() — API returned no payment URL. Response keys: ' . implode( ',', array_keys( $response ) ) );
 			return '';
 		}
 
@@ -1048,7 +1059,6 @@ class Addon extends \GFPaymentAddOn {
 		\GFAPI::update_entry_property( $entry_id, 'payment_amount', $amount );
 
 		$this->log_debug( __METHOD__ . "(): Entry #{$entry_id} → redirect to ifthenpay. TxID: {$transaction_id}" );
-		error_log( sprintf( '[ifthenpay-gf] redirect_url() OK — entry=%d → %s (tx=%s)', $entry_id, $redirect_url, $transaction_id ) );
 
 		return $redirect_url;
 	}
@@ -1231,7 +1241,7 @@ class Addon extends \GFPaymentAddOn {
 		$b = $banners[ $status ];
 
 		$banner = sprintf(
-			'<div class="iftp-gf-payment-banner %1$s" role="status" aria-live="polite"><div class="iftp-gf-payment-banner__icon" aria-hidden="true"></div><div class="iftp-gf-payment-banner__text"><strong>%2$s</strong><span>%3$s</span></div></div>',
+			'<div class="iftp-gf-payment-banner gform-theme__no-reset--children %1$s" role="status" aria-live="polite"><div class="iftp-gf-payment-banner__icon" aria-hidden="true"></div><div class="iftp-gf-payment-banner__text"><strong>%2$s</strong><span>%3$s</span></div></div>',
 			esc_attr( $b['class'] ),
 			esc_html( $b['title'] ),
 			esc_html( $b['body'] )
@@ -1254,6 +1264,7 @@ class Addon extends \GFPaymentAddOn {
 
 	public function handle_gateway_callback(): void {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- server-to-server callback validated by entry-meta crosscheck
+		$_GET = wp_unslash($_GET);
 		if ( empty( $_GET['iftp_gf_callback'] ) ) {
 			return;
 		}
@@ -1303,7 +1314,6 @@ class Addon extends \GFPaymentAddOn {
 				gform_update_meta( $ref, 'iftp_gf_payment_status', 'failed' );
 			}
 
-			error_log( "[ifthenpay-gf] webhook → entry #{$ref} marked {$status}" );
 			status_header( 200 );
 			exit( 'OK' );
 		}
@@ -1312,21 +1322,19 @@ class Addon extends \GFPaymentAddOn {
 		foreach ( [ 'apk', 'val', 'mtd', 'req' ] as $required ) {
 			if ( ! isset( $_GET[ $required ] ) ) {
 				status_header( 400 );
-				exit( 'Missing ' . $required );
+				exit( 'Missing ' . esc_html($required) );
 			}
 		}
 
-		$apk = sanitize_text_field( wp_unslash( (string) $_GET['apk'] ) );
-		$val = sanitize_text_field( wp_unslash( (string) $_GET['val'] ) );
-		$mtd = sanitize_text_field( wp_unslash( (string) $_GET['mtd'] ) );
-		$req = sanitize_text_field( wp_unslash( (string) $_GET['req'] ) );
-		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+		$apk = sanitize_text_field( wp_unslash( (string) ( $_GET['apk'] ?? '' ) ) );
+		$val = sanitize_text_field( wp_unslash( (string) ( $_GET['val'] ?? '' ) ) );
+		$mtd = sanitize_text_field( wp_unslash( (string) ( $_GET['mtd'] ?? '' ) ) );
+		$req = sanitize_text_field( wp_unslash( (string) ( $_GET['req'] ?? '' ) ) );
 
 		// Validate gateway key — apk = base64(gateway_key) (MemberPress convention).
 		$decoded_apk      = trim( (string) base64_decode( $apk, true ) );
 		$expected_gateway = (string) gform_get_meta( $ref, 'iftp_gf_gateway_key' );
 		if ( $decoded_apk === '' || $decoded_apk !== $expected_gateway ) {
-			error_log( "[ifthenpay-gf] webhook → entry #{$ref} rejected: apk mismatch (decoded='{$decoded_apk}' expected='{$expected_gateway}')" );
 			status_header( 403 );
 			exit( 'apk mismatch' );
 		}
@@ -1334,7 +1342,6 @@ class Addon extends \GFPaymentAddOn {
 		// Validate amount.
 		$expected_amount = (float) gform_get_meta( $ref, 'iftp_gf_payment_amount' );
 		if ( $expected_amount <= 0 || (float) $val !== $expected_amount ) {
-			error_log( "[ifthenpay-gf] webhook → entry #{$ref} rejected: amount mismatch (val={$val} expected={$expected_amount})" );
 			status_header( 403 );
 			exit( 'amount mismatch' );
 		}
@@ -1342,7 +1349,6 @@ class Addon extends \GFPaymentAddOn {
 		// Validate method against the live keyed catalog.
 		$catalog = self::get_keyed_method_catalog();
 		if ( ! isset( $catalog[ strtoupper( $mtd ) ] ) && ! is_numeric( $mtd ) ) {
-			error_log( "[ifthenpay-gf] webhook → entry #{$ref} rejected: unknown method '{$mtd}'" );
 			status_header( 403 );
 			exit( 'method invalid' );
 		}
@@ -1364,7 +1370,6 @@ class Addon extends \GFPaymentAddOn {
 		] );
 		gform_update_meta( $ref, 'iftp_gf_payment_status', 'paid' );
 
-		error_log( sprintf( '[ifthenpay-gf] webhook → entry #%d → complete_payment (mtd=%s req=%s val=%s)', $ref, $mtd, $req, $val ) );
 		status_header( 200 );
 		exit( 'OK' );
 	}
@@ -1421,11 +1426,8 @@ class Addon extends \GFPaymentAddOn {
 				try {
 					$verified = IfthenpayClient::verify_transaction_paid( $tx );
 				} catch ( \RuntimeException $e ) {
-					error_log( sprintf( '[ifthenpay-gf] verify_transaction_paid() error for entry #%d tx=%s: %s', $entry_id, $tx, $e->getMessage() ) );
 					$verified = null;
 				}
-			} else {
-				error_log( "[ifthenpay-gf] return for entry #{$entry_id} arrived with no transaction_id — skipping API verification." );
 			}
 
 			if ( is_array( $verified ) ) {
@@ -1443,7 +1445,6 @@ class Addon extends \GFPaymentAddOn {
 				] );
 				gform_update_meta( $entry_id, 'iftp_gf_payment_status', 'paid' );
 				$flash = 'paid';
-				error_log( sprintf( '[ifthenpay-gf] entry #%d → complete_payment (verified, mtd=%s tx=%s)', $entry_id, $method, $tx ) );
 			} else {
 				// 404 from the API — payment reference exists but not yet paid.
 				// Common with Multibanco/Payshop. Leave the entry in Processing and
@@ -1459,7 +1460,6 @@ class Addon extends \GFPaymentAddOn {
 				);
 				gform_update_meta( $entry_id, 'iftp_gf_payment_status', 'pending_verification' );
 				$flash = 'pending';
-				error_log( sprintf( '[ifthenpay-gf] entry #%d NOT marked paid — API returned 404 for tx=%s (awaiting webhook).', $entry_id, $tx ) );
 			}
 		} elseif ( in_array( $status, [ 'cancel', 'cancelled', 'canceled' ], true ) ) {
 			\GFAPI::update_entry_property( $entry_id, 'payment_status', 'Cancelled' );

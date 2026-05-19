@@ -11,14 +11,29 @@
 	font-family: inherit;
 }
 
-/* ---- Outer card (matches GF orbital border style) ---- */
+/* ---- Outer card (GF control surface tokens) ----
+ * Background / border / radius use the same control tokens as input fields, so
+ * the card visually tracks whatever per-form theme the admin picks (e.g. the
+ * magenta example with --gf-ctrl-border-color: #ff3cfc).
+ * Padding uses --gf-padding-y/--gf-padding-x (general spacing, 12px default in
+ * orbital) because --gf-ctrl-padding-y is 0 in orbital (inputs are sized via
+ * --gf-ctrl-size, not padding-y, so reusing it would flatten our card).
+ * Each fallback matches the legacy 2.5 theme look.
+ */
 .iftp-pbl-public-box {
 	max-width: 100%;
-	border: 1px solid rgb(17 35 55 / 10%);
+	background: var(--gf-ctrl-bg-color, #fff);
+	color: var(--gf-ctrl-color, var(--gf-color-out-ctrl-dark-darker, #112337));
+	border-width: var(--gf-ctrl-border-width, 1px);
+	border-style: var(--gf-ctrl-border-style, solid);
+	border-color: var(--gf-ctrl-border-color, rgb(17 35 55 / 10%));
 	border-radius: var(--gf-radius, 3px);
-	background: #fff;
-	padding: 16px;
+	padding-block: var(--gf-padding-y, 16px);
+	padding-inline: var(--gf-padding-x, 16px);
 	text-align: left;
+	font-family: var(--gf-ctrl-font-family, inherit);
+	font-size: var(--gf-ctrl-font-size, var(--gf-font-size-secondary, 14px));
+	line-height: 1.5;
 }
 
 /* ---- Header (logo + title) ---- */
@@ -32,10 +47,9 @@
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 36px;
-	height: 36px;
+	width: 30px;
+	height: 30px;
 	border-radius: var(--gf-radius, 3px);
-	background: #f5f5f5;
 	flex-shrink: 0;
 }
 
@@ -87,6 +101,7 @@
 	width: 52px;
 	height: 36px;
 	padding: 4px;
+	border-radius: var(--gf-radius, 3px);
 	transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -101,11 +116,10 @@
 	display: block;
 }
 
-/* ---- Info block ---- */
+/* ---- Info block (subtle inset using the form's outer-surface light tint) ---- */
 .iftp-pbl-info {
 	margin-top: 12px;
 	padding: 10px 12px;
-	background: #fafafa;
 	border-radius: var(--gf-radius, 3px);
 	font-size: var(--gf-font-size-tertiary, 13px);
 	color: var(--gf-color-out-ctrl-dark, #585e6a);
@@ -261,6 +275,7 @@
 	border-color: #a7f3d0;
 	color: #065f46;
 }
+
 .iftp-gf-payment-banner.is-success .iftp-gf-payment-banner__icon {
 	background-color: #10b981;
 	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23fff'><path fill-rule='evenodd' d='M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 011.4-1.4L9 11.6l6.3-6.3a1 1 0 011.4 0z' clip-rule='evenodd'/></svg>");
@@ -271,6 +286,7 @@
 	border-color: #fecaca;
 	color: #991b1b;
 }
+
 .iftp-gf-payment-banner.is-error .iftp-gf-payment-banner__icon {
 	background-color: #ef4444;
 	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23fff'><path fill-rule='evenodd' d='M4.3 4.3a1 1 0 011.4 0L10 8.6l4.3-4.3a1 1 0 111.4 1.4L11.4 10l4.3 4.3a1 1 0 11-1.4 1.4L10 11.4l-4.3 4.3a1 1 0 11-1.4-1.4L8.6 10 4.3 5.7a1 1 0 010-1.4z' clip-rule='evenodd'/></svg>");
@@ -281,6 +297,7 @@
 	border-color: #fde68a;
 	color: #92400e;
 }
+
 .iftp-gf-payment-banner.is-cancel .iftp-gf-payment-banner__icon {
 	background-color: #f59e0b;
 	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23fff'><path fill-rule='evenodd' d='M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 012 0v4a1 1 0 11-2 0V9zm1-4a1 1 0 100 2 1 1 0 000-2z' clip-rule='evenodd'/></svg>");
@@ -292,6 +309,7 @@
 	border-color: #bfdbfe;
 	color: #1e3a8a;
 }
+
 .iftp-gf-payment-banner.is-info .iftp-gf-payment-banner__icon {
 	background-color: #3b82f6;
 	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23fff'><path fill-rule='evenodd' d='M10 18a8 8 0 100-16 8 8 0 000 16zm.75-12a.75.75 0 00-1.5 0v4.5l3 1.5a.75.75 0 10.67-1.34l-2.17-1.08V6z' clip-rule='evenodd'/></svg>");

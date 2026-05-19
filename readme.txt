@@ -1,4 +1,4 @@
-=== ifthenpay | Payments for GravityForms ===
+=== Ifthenpay | Payments for GravityForms ===
 Contributors: ifthenpay
 Tags: ifthenpay, gravityforms, payments, pay by link, gateway
 Requires at least: 6.5
@@ -28,24 +28,21 @@ All settings are managed within GravityForms and your ifthenpay Backoffice. The 
 2. Secure transactions
 3. Automatic payment confirmation (fast access)
 4. Support for multiple payment methods (cards, wallets, transfers)
-5. Coupon and discount support via GravityForms
-6. Modal or popup payment display modes
-7. Real-time payment status in GravityForms
-8. Multi-language support (EN, ES, FR, PT)
-9. Security-first approach (no card data stored)
+5. Real-time payment status in GravityForms
+6. Multi-language support (EN, ES, FR, PT)
+7. Security-first approach (no card data stored)
 
 == Requirements ==
 * An active ifthenpay merchant account.
-* A Gateway Key configured for GravityForms (request via ifthenpay support).
-* Backoffice Key
+* The payment methods you want enabled (our helpdesk team will guide you).
 * WordPress 6.5+ and PHP 8.2+, with GravityForms installed and activated.
 * HTTPS (SSL) enabled on your site.
 
 == Installation ==
 1. Install: Upload the plugin zip via Plugins → Add New → Upload, or install from WordPress.org and Activate.
 2. Credentials: Ensure your ifthenpay account has an active GravityForms Gateway Key with desired payment methods enabled.
-3. Setup: Go to GravityForms → Settings → Payments and enter your Backoffice Key.
-4. Form config: Create/Edit a form → Payments tab → Add the Ifthenpay field on your form → enable "ifthenpay | Payment Gateway" and select a Gateway Key.
+3. Setup: Go to GravityForms → Settings → Ifthenpay and enter your Backoffice Key.
+4. Form config: Create/Edit a form → Settings → Ifthenpay → "Add New" Feed and select a Gateway Key.
 
 == Frequently Asked Questions ==
 
@@ -61,14 +58,11 @@ Any method enabled on your ifthenpay Gateway Key (e.g. Multibanco, MB WAY, Paysh
 = How does the payment process work? =
 Customers submit a WPForm and are presented with a secure payment page (modal or popup). After completing payment, ifthenpay sends a callback to update the payment status automatically.
 
-= Can I use GravityForms coupons? =
-Yes. GravityForms coupon and total fields are fully supported and automatically processed.
-
 = What happens if a payment fails? =
 The entry is marked as Failed. Customers can retry payment depending on your form setup.
 
 = Can I customize the payment experience? =
-Yes. You can configure display mode (modal/popup), button label, payment description, and styling via GravityForms.
+Yes. You can configure display mode, button label, payment description, and styling via GravityForms.
 
 = Is there a sandbox? =
 ifthenpay may provide test entities; if unavailable, use a low-value live test.
@@ -98,10 +92,9 @@ All network requests are performed server-side over HTTPS. Sensitive credentials
 1. **(Admin Only) Backoffice Synchronization under GravityForms Settings Payments**
 2. **(Admin Only) GravityForms's admin page (Creation/Editing Form -> Payments)**
 3. **(Admin Only) Adding ifthenpay's Payment field to the selected form**
-4. **(Admin Only) ifthenpay's Payment field Basic configuration options**
-5. **(Admin Only) ifthenpay's Payment field Advanced configuration options**
-6. **(Customers Experience) Payment Gateway field display varies by GravityForms settings**
-7. **(Customers Experience) Payment Modal Window**
+4. **(Customers Experience) Payment Gateway field display varies by GravityForms settings**
+6. **(Customers Experience) Payment Window**
+7. **(Customers Experience)  Successful Payment**
 
 == Changelog ==
 

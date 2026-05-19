@@ -102,7 +102,7 @@ class GF_Field_Ifthenpay extends \GF_Field {
 
 		ob_start();
 		?>
-		<div class="ginput_container iftp-pbl-gf-field iftp-pbl-is-preview"
+		<div class="ginput_container iftp-pbl-gf-field iftp-pbl-is-preview gform-theme__no-reset--children"
 			 data-form-id="<?php echo esc_attr( (string) $form_id ); ?>">
 
 			<div class="iftp-pbl-public-box">
@@ -180,7 +180,7 @@ class GF_Field_Ifthenpay extends \GF_Field {
 	private function get_editor_preview(): string {
 		ob_start();
 		?>
-		<div class="ginput_container iftp-pbl-gf-field">
+		<div class="ginput_container iftp-pbl-gf-field gform-theme__no-reset--children">
 			<div class="iftp-pbl-public-box">
 				<div class="iftp-pbl-header">
 					<span class="iftp-pbl-header-icon" aria-hidden="true">

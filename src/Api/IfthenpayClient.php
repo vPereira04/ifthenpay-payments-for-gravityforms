@@ -59,23 +59,6 @@ final class IfthenpayClient {
 		delete_transient( self::AVAIL_METHODS_TRANSIENT );
 	}
 
-	public static function validate_backoffice_key( string $backoffice_key ): bool {
-		$backoffice_key = sanitize_text_field( $backoffice_key );
-
-		if ( $backoffice_key === '' ) {
-			return false;
-		}
-
-		$url = add_query_arg( [ 'boKey' => $backoffice_key ], self::API_BASE . '/gateway/get' );
-
-		try {
-			$data = self::request( 'GET', $url );
-			return ! empty( $data );
-		} catch ( RuntimeException ) {
-			return false;
-		}
-	}
-
 	public static function get_available_methods(): array {
 		return self::request( 'GET', self::API_BASE . '/gateway/methods/available' );
 	}
