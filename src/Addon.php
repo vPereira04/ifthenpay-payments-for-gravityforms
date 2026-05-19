@@ -80,9 +80,14 @@ class Addon extends \GFPaymentAddOn {
 
 		\GF_Fields::register( new \Ifthenpay\GravityForms\Field\GF_Field_Ifthenpay() );
 		add_action( 'wp', [ $this, 'handle_gateway_return' ] );
+		add_action( 'wp', [ $this, 'handle_gateway_callback' ] );
 
 		// Block form submission if another payment add-on also has an active feed on the form.
 		add_filter( 'gform_validation', [ $this, 'enforce_single_payment_gateway' ] );
+
+		// Inject a Stripe-style payment-result banner above the form when the user
+		// returns from the gateway (handle_gateway_return appends ?iftp_gf_status=...).
+		add_filter( 'gform_get_form_filter', [ $this, 'inject_payment_status_banner' ], 10, 2 );
 	}
 
 	public function init_admin(): void {
@@ -482,9 +487,14 @@ class Addon extends \GFPaymentAddOn {
 					$has_account = $account !== '';
 				}
 
+				// A method is "ready" only when it has an account (static) or has
+				// at least one selectable account (dynamic). Unready methods get the
+				// Activate UX path instead of an enable-toggle.
+				$is_ready     = $is_dynamic ? $has_accounts : $has_account;
 				$item_classes = 'iftp-gf-method-item';
 				if ( $is_enabled )    { $item_classes .= ' is-enabled'; }
 				if ( ! $is_visible )  { $item_classes .= ' is-unavailable'; }
+				if ( ! $is_ready )    { $item_classes .= ' is-unactivated'; }
 				?>
 				<div class="<?php echo esc_attr( $item_classes ); ?>" data-entity="<?php echo esc_attr( $entity_key ); ?>">
 
@@ -493,8 +503,8 @@ class Addon extends \GFPaymentAddOn {
 							type="checkbox"
 							name="_gform_setting_methods_config[<?php echo esc_attr( $entity_key ); ?>][enabled]"
 							value="1"
-							<?php checked( $is_enabled ); ?>
-							<?php disabled( ! $is_visible ); ?>
+							<?php checked( $is_enabled && $is_ready ); ?>
+							<?php disabled( ! $is_visible || ! $is_ready ); ?>
 							class="iftp-gf-method-toggle"
 							data-entity="<?php echo esc_attr( $entity_key ); ?>"
 						/>
@@ -526,7 +536,7 @@ class Addon extends \GFPaymentAddOn {
 										<option
 											value="<?php echo esc_attr( $acct['account'] ); ?>"
 											<?php selected( $saved_account, $acct['account'] ); ?>
-										><?php echo esc_html( $acct['label'] ); ?> &mdash; <?php echo esc_html( $acct['account'] ); ?></option>
+										><?php echo esc_html( $acct['label'] ); ?></option>
 									<?php endforeach; ?>
 								</select>
 							<?php else : ?>
@@ -1031,6 +1041,11 @@ class Addon extends \GFPaymentAddOn {
 		}
 
 		gform_update_meta( $entry_id, 'iftp_gf_payment_status', 'pending' );
+		// Persist the resolved amount so handle_gateway_return() / webhook handler
+		// can feed it back into GFPaymentAddOn::complete_payment(). GF only sets
+		// payment_amount on the entry inside complete_payment(), not before.
+		gform_update_meta( $entry_id, 'iftp_gf_payment_amount', $amount );
+		\GFAPI::update_entry_property( $entry_id, 'payment_amount', $amount );
 
 		$this->log_debug( __METHOD__ . "(): Entry #{$entry_id} → redirect to ifthenpay. TxID: {$transaction_id}" );
 		error_log( sprintf( '[ifthenpay-gf] redirect_url() OK — entry=%d → %s (tx=%s)', $entry_id, $redirect_url, $transaction_id ) );
@@ -1146,6 +1161,214 @@ class Addon extends \GFPaymentAddOn {
 		return $validation_result;
 	}
 
+	/**
+	 * Filter: gform_get_form_filter
+	 *
+	 * After the gateway return handler redirects the customer back to the form
+	 * page with ?iftp_gf_status=paid|failed|cancelled, this prepends a styled
+	 * notice above the form HTML — same UX pattern as GF Stripe / WooCommerce
+	 * showing a "Payment received" / "Payment failed" banner after checkout.
+	 *
+	 * Only renders on forms that actually have an active ifthenpay feed, so we
+	 * don't pollute unrelated forms when multiple forms share a page.
+	 *
+	 * @param string $form_string The form's rendered HTML.
+	 * @param array  $form        The GF form object.
+	 * @return string
+	 */
+	public function inject_payment_status_banner( $form_string, $form ): string {
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- gateway return flash; not processing form data
+		if ( empty( $_GET['iftp_gf_status'] ) ) {
+			return $form_string;
+		}
+
+		$form_id = (int) rgar( $form, 'id' );
+		if ( $form_id <= 0 || empty( $this->get_active_feeds( $form_id ) ) ) {
+			return $form_string;
+		}
+
+		$status = sanitize_key( wp_unslash( (string) $_GET['iftp_gf_status'] ) );
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+
+		// Ensure the banner CSS loads even when the form has no iftp_pbl field
+		// (the field's render hook is what normally enqueues frontend.css).
+		if ( ! wp_style_is( 'ifthenpay-gf-frontend', 'enqueued' ) ) {
+			wp_enqueue_style(
+				'ifthenpay-gf-frontend',
+				IFTP_GF_URL . 'assets/css/frontend.css',
+				[],
+				IFTP_GF_VERSION
+			);
+		}
+
+		$banners = [
+			'paid'      => [
+				'class' => 'is-success',
+				'title' => __( 'Payment received', 'ifthenpay-payments-for-gravityforms' ),
+				'body'  => __( 'Thank you — your payment has been confirmed and the form was submitted successfully.', 'ifthenpay-payments-for-gravityforms' ),
+			],
+			'pending'   => [
+				'class' => 'is-info',
+				'title' => __( 'Awaiting payment confirmation', 'ifthenpay-payments-for-gravityforms' ),
+				'body'  => __( 'Your payment reference has been generated. The form will be confirmed automatically once ifthenpay receives the payment — you can close this page in the meantime.', 'ifthenpay-payments-for-gravityforms' ),
+			],
+			'failed'    => [
+				'class' => 'is-error',
+				'title' => __( 'Payment failed', 'ifthenpay-payments-for-gravityforms' ),
+				'body'  => __( 'Something went wrong at the payment gateway and your payment was not processed. Please submit the form again to retry.', 'ifthenpay-payments-for-gravityforms' ),
+			],
+			'cancelled' => [
+				'class' => 'is-cancel',
+				'title' => __( 'Payment cancelled', 'ifthenpay-payments-for-gravityforms' ),
+				'body'  => __( 'You cancelled the payment before it was completed. Submit the form again if you want to try a different method.', 'ifthenpay-payments-for-gravityforms' ),
+			],
+		];
+
+		if ( ! isset( $banners[ $status ] ) ) {
+			return $form_string;
+		}
+
+		$b = $banners[ $status ];
+
+		$banner = sprintf(
+			'<div class="iftp-gf-payment-banner %1$s" role="status" aria-live="polite"><div class="iftp-gf-payment-banner__icon" aria-hidden="true"></div><div class="iftp-gf-payment-banner__text"><strong>%2$s</strong><span>%3$s</span></div></div>',
+			esc_attr( $b['class'] ),
+			esc_html( $b['title'] ),
+			esc_html( $b['body'] )
+		);
+
+		return $banner . $form_string;
+	}
+
+	// -------------------------------------------------------------------------
+	// Server-to-server webhook handler (MemberPress pattern)
+	//
+	// Trigger param: ?iftp_gf_callback=1
+	// SUCCESS payload:  ?iftp_gf_callback=1&ref={entry_id}&apk={base64(gateway_key)}&val={amount}&mtd={MB|MBWAY|...}&req={request_id}
+	// FAILURE payload:  ?iftp_gf_callback=1&ref={entry_id}&status={cancelled|error}
+	//
+	// Validates the call against entry meta written by redirect_url() and only
+	// then flips the entry through complete_payment() / fail_payment().
+	// Always exits with a JSON-ish status code — no HTML, no redirect.
+	// -------------------------------------------------------------------------
+
+	public function handle_gateway_callback(): void {
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- server-to-server callback validated by entry-meta crosscheck
+		if ( empty( $_GET['iftp_gf_callback'] ) ) {
+			return;
+		}
+
+		if ( ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) !== 'GET' ) {
+			status_header( 405 );
+			exit( 'Method Not Allowed' );
+		}
+
+		$ref = isset( $_GET['ref'] ) ? absint( wp_unslash( $_GET['ref'] ) ) : 0;
+		if ( $ref <= 0 ) {
+			status_header( 400 );
+			exit( 'Missing ref' );
+		}
+
+		$entry = \GFAPI::get_entry( $ref );
+		if ( is_wp_error( $entry ) || ! is_array( $entry ) ) {
+			status_header( 404 );
+			exit( 'Entry not found' );
+		}
+
+		// Failure callback: ?status=cancelled|error
+		if ( ! empty( $_GET['status'] ) ) {
+			$status = sanitize_text_field( wp_unslash( (string) $_GET['status'] ) );
+			if ( ! in_array( $status, [ 'cancelled', 'error' ], true ) ) {
+				status_header( 400 );
+				exit( 'Invalid status' );
+			}
+
+			$existing = (string) gform_get_meta( $ref, 'iftp_gf_payment_status' );
+			if ( in_array( $existing, [ 'failed', 'cancelled', 'paid' ], true ) ) {
+				status_header( 200 );
+				exit( 'OK (idempotent)' );
+			}
+
+			if ( $status === 'cancelled' ) {
+				\GFAPI::update_entry_property( $ref, 'payment_status', 'Cancelled' );
+				$this->add_note( $ref, esc_html__( 'Payment cancelled at the ifthenpay gateway (server-side callback).', 'ifthenpay-payments-for-gravityforms' ), 'error' );
+				gform_update_meta( $ref, 'iftp_gf_payment_status', 'cancelled' );
+			} else {
+				$amount = (float) gform_get_meta( $ref, 'iftp_gf_payment_amount' );
+				$this->fail_payment( $entry, [
+					'transaction_id' => (string) gform_get_meta( $ref, 'iftp_gf_transaction_id' ),
+					'amount'         => $amount,
+					'type'           => 'fail_payment',
+				] );
+				gform_update_meta( $ref, 'iftp_gf_payment_status', 'failed' );
+			}
+
+			error_log( "[ifthenpay-gf] webhook → entry #{$ref} marked {$status}" );
+			status_header( 200 );
+			exit( 'OK' );
+		}
+
+		// Success callback: ?ref=&apk=&val=&mtd=&req=
+		foreach ( [ 'apk', 'val', 'mtd', 'req' ] as $required ) {
+			if ( ! isset( $_GET[ $required ] ) ) {
+				status_header( 400 );
+				exit( 'Missing ' . $required );
+			}
+		}
+
+		$apk = sanitize_text_field( wp_unslash( (string) $_GET['apk'] ) );
+		$val = sanitize_text_field( wp_unslash( (string) $_GET['val'] ) );
+		$mtd = sanitize_text_field( wp_unslash( (string) $_GET['mtd'] ) );
+		$req = sanitize_text_field( wp_unslash( (string) $_GET['req'] ) );
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+
+		// Validate gateway key — apk = base64(gateway_key) (MemberPress convention).
+		$decoded_apk      = trim( (string) base64_decode( $apk, true ) );
+		$expected_gateway = (string) gform_get_meta( $ref, 'iftp_gf_gateway_key' );
+		if ( $decoded_apk === '' || $decoded_apk !== $expected_gateway ) {
+			error_log( "[ifthenpay-gf] webhook → entry #{$ref} rejected: apk mismatch (decoded='{$decoded_apk}' expected='{$expected_gateway}')" );
+			status_header( 403 );
+			exit( 'apk mismatch' );
+		}
+
+		// Validate amount.
+		$expected_amount = (float) gform_get_meta( $ref, 'iftp_gf_payment_amount' );
+		if ( $expected_amount <= 0 || (float) $val !== $expected_amount ) {
+			error_log( "[ifthenpay-gf] webhook → entry #{$ref} rejected: amount mismatch (val={$val} expected={$expected_amount})" );
+			status_header( 403 );
+			exit( 'amount mismatch' );
+		}
+
+		// Validate method against the live keyed catalog.
+		$catalog = self::get_keyed_method_catalog();
+		if ( ! isset( $catalog[ strtoupper( $mtd ) ] ) && ! is_numeric( $mtd ) ) {
+			error_log( "[ifthenpay-gf] webhook → entry #{$ref} rejected: unknown method '{$mtd}'" );
+			status_header( 403 );
+			exit( 'method invalid' );
+		}
+
+		// Idempotency.
+		$existing = (string) gform_get_meta( $ref, 'iftp_gf_payment_status' );
+		if ( $existing === 'paid' ) {
+			status_header( 200 );
+			exit( 'OK (already paid)' );
+		}
+
+		$this->complete_payment( $entry, [
+			'transaction_id'   => $req,
+			'amount'           => $expected_amount,
+			'payment_method'   => $mtd,
+			'payment_date'     => gmdate( 'y-m-d H:i:s' ),
+			'transaction_type' => 'payment',
+			'type'             => 'complete_payment',
+		] );
+		gform_update_meta( $ref, 'iftp_gf_payment_status', 'paid' );
+
+		error_log( sprintf( '[ifthenpay-gf] webhook → entry #%d → complete_payment (mtd=%s req=%s val=%s)', $ref, $mtd, $req, $val ) );
+		status_header( 200 );
+		exit( 'OK' );
+	}
+
 	// -------------------------------------------------------------------------
 	// Gateway return handler (called on 'wp' action)
 	// -------------------------------------------------------------------------
@@ -1171,28 +1394,78 @@ class Addon extends \GFPaymentAddOn {
 		// Idempotency guard — gateway sometimes hits the return URL twice.
 		$existing = (string) gform_get_meta( $entry_id, 'iftp_gf_payment_status' );
 		if ( in_array( $existing, [ 'paid', 'failed', 'cancelled' ], true ) ) {
-			$this->redirect_after_return( $entry );
+			$this->redirect_after_return( $entry, $existing );
 			return;
 		}
 
 		$context = IfthenpayReturn::resolve_return_context( $return_data );
-		$amount  = (float) rgar( $entry, 'payment_amount' );
+		// Resolve amount: entry property first, then our redirect_url snapshot meta.
+		$amount = (float) rgar( $entry, 'payment_amount' );
+		if ( $amount <= 0 ) {
+			$amount = (float) gform_get_meta( $entry_id, 'iftp_gf_payment_amount' );
+		}
+
+		$flash = '';
 
 		if ( $status === 'success' ) {
-			$this->complete_payment( $entry, [
-				'transaction_id'   => $context['transaction_id'] ?? '',
-				'amount'           => $amount,
-				'payment_method'   => $context['payment_method'] ?? '',
-				'payment_date'     => gmdate( 'y-m-d H:i:s' ),
-				'transaction_type' => 'payment',
-				'type'             => 'complete_payment',
-			] );
-			gform_update_meta( $entry_id, 'iftp_gf_payment_status', 'paid' );
-			$this->log_debug( __METHOD__ . "(): Entry #{$entry_id} → complete_payment()." );
+			$tx = (string) ( $context['transaction_id'] ?? '' );
+
+			// Authoritative payment confirmation: the success redirect alone is not
+			// reliable for asynchronous methods (Multibanco/Payshop generate a
+			// reference and redirect back without the payment being received yet).
+			// /gateway/transaction/status/get returns 200 only when the payment has
+			// actually been received by ifthenpay; 404 means "reference exists but
+			// not paid". We only call complete_payment() on a true 200.
+			$verified = null;
+			if ( $tx !== '' ) {
+				try {
+					$verified = IfthenpayClient::verify_transaction_paid( $tx );
+				} catch ( \RuntimeException $e ) {
+					error_log( sprintf( '[ifthenpay-gf] verify_transaction_paid() error for entry #%d tx=%s: %s', $entry_id, $tx, $e->getMessage() ) );
+					$verified = null;
+				}
+			} else {
+				error_log( "[ifthenpay-gf] return for entry #{$entry_id} arrived with no transaction_id — skipping API verification." );
+			}
+
+			if ( is_array( $verified ) ) {
+				// Trust the API's PaymentMethod over the (often empty) URL param.
+				$api_method = (string) ( $verified['PaymentMethod'] ?? $verified['paymentMethod'] ?? '' );
+				$method     = $api_method !== '' ? $api_method : (string) ( $context['payment_method'] ?? '' );
+
+				$this->complete_payment( $entry, [
+					'transaction_id'   => (string) ( $verified['TransactionId'] ?? $verified['transactionId'] ?? $tx ),
+					'amount'           => $amount,
+					'payment_method'   => $method,
+					'payment_date'     => gmdate( 'y-m-d H:i:s' ),
+					'transaction_type' => 'payment',
+					'type'             => 'complete_payment',
+				] );
+				gform_update_meta( $entry_id, 'iftp_gf_payment_status', 'paid' );
+				$flash = 'paid';
+				error_log( sprintf( '[ifthenpay-gf] entry #%d → complete_payment (verified, mtd=%s tx=%s)', $entry_id, $method, $tx ) );
+			} else {
+				// 404 from the API — payment reference exists but not yet paid.
+				// Common with Multibanco/Payshop. Leave the entry in Processing and
+				// add a note so the merchant knows we're awaiting the webhook.
+				$this->add_note(
+					$entry_id,
+					sprintf(
+						/* translators: %s: transaction id */
+						esc_html__( 'Customer returned from the ifthenpay gateway but payment is not yet received (transaction %s). Awaiting webhook callback.', 'ifthenpay-payments-for-gravityforms' ),
+						$tx !== '' ? $tx : '—'
+					),
+					''
+				);
+				gform_update_meta( $entry_id, 'iftp_gf_payment_status', 'pending_verification' );
+				$flash = 'pending';
+				error_log( sprintf( '[ifthenpay-gf] entry #%d NOT marked paid — API returned 404 for tx=%s (awaiting webhook).', $entry_id, $tx ) );
+			}
 		} elseif ( in_array( $status, [ 'cancel', 'cancelled', 'canceled' ], true ) ) {
 			\GFAPI::update_entry_property( $entry_id, 'payment_status', 'Cancelled' );
 			$this->add_note( $entry_id, esc_html__( 'Payment cancelled by the customer at the ifthenpay gateway.', 'ifthenpay-payments-for-gravityforms' ), 'error' );
 			gform_update_meta( $entry_id, 'iftp_gf_payment_status', 'cancelled' );
+			$flash = 'cancelled';
 			$this->log_debug( __METHOD__ . "(): Entry #{$entry_id} marked Cancelled." );
 		} elseif ( $status === 'error' ) {
 			$this->fail_payment( $entry, [
@@ -1201,23 +1474,31 @@ class Addon extends \GFPaymentAddOn {
 				'type'           => 'fail_payment',
 			] );
 			gform_update_meta( $entry_id, 'iftp_gf_payment_status', 'failed' );
+			$flash = 'failed';
 			$this->log_debug( __METHOD__ . "(): Entry #{$entry_id} → fail_payment()." );
 		}
 
-		$this->redirect_after_return( $entry );
+		$this->redirect_after_return( $entry, $flash );
 	}
 
 	/**
-	 * Clean-redirect after a gateway return: strip the iftp_gf_* query args
-	 * from the original source URL so a refresh doesn't re-trigger the handler.
+	 * Clean-redirect after a gateway return: strip the iftp_gf_* gateway args
+	 * from the original source URL so a refresh doesn't re-trigger the handler,
+	 * then re-append a single `iftp_gf_status` flash param so the next page render
+	 * can display a Stripe-style payment-result banner above the form.
 	 */
-	private function redirect_after_return( array $entry ): void {
+	private function redirect_after_return( array $entry, string $flash = '' ): void {
 		$source_url = (string) rgar( $entry, 'source_url' );
 		if ( $source_url === '' ) {
 			$source_url = home_url( '/' );
 		}
 
-		wp_safe_redirect( esc_url_raw( remove_query_arg( [ 'iftp_gf_pay', 'id', 'transaction_id', 'iftp_gateway' ], $source_url ) ) );
+		$clean = remove_query_arg( [ 'iftp_gf_pay', 'id', 'transaction_id', 'iftp_gateway' ], $source_url );
+		if ( in_array( $flash, [ 'paid', 'failed', 'cancelled', 'pending' ], true ) ) {
+			$clean = add_query_arg( 'iftp_gf_status', $flash, $clean );
+		}
+
+		wp_safe_redirect( esc_url_raw( $clean ) );
 		exit;
 	}
 
@@ -1485,17 +1766,40 @@ class Addon extends \GFPaymentAddOn {
 
 		$is_dynamic = self::is_dynamic_gateway( $gateway_key );
 
-		if ( $is_dynamic ) {
-			$dynamic_accounts  = $this->fetch_cached_dynamic_accounts( $gateway_key );
-			$keyed_catalog     = self::get_keyed_method_catalog();
+		$keyed_catalog = self::get_keyed_method_catalog();
 
-			foreach ( array_keys( $dynamic_accounts ) as $entity ) {
-				$entity_key                       = strtoupper( (string) $entity );
-				$available_methods[ $entity_key ] = $keyed_catalog[ $entity_key ]
-					?? [ 'method' => $entity_key, 'account' => '' ];
+		if ( $is_dynamic ) {
+			$dynamic_accounts = $this->fetch_cached_dynamic_accounts( $gateway_key );
+		}
+
+		// Always emit one row per visible method from the keyed catalog so unactivated
+		// methods can render an "Activate" link (LatePoint / MemberPress / WPForms UX).
+		// For dynamic gateways the account is empty until the admin picks one from the
+		// dropdown; for static gateways it comes from the gateway-keys row (may be empty
+		// if not yet provisioned). Methods marked IsVisible=false in the API response
+		// are dropped entirely — the gateway does not support them for new payments.
+		foreach ( $keyed_catalog as $entity_key => $cat_entry ) {
+			if ( empty( $cat_entry['is_visible'] ) ) {
+				continue;
 			}
-		} elseif ( isset( $catalog[ $gateway_key ]['methods'] ) ) {
-			$available_methods = $catalog[ $gateway_key ]['methods'];
+			$entity_key = strtoupper( (string) $entity_key );
+
+			if ( $is_dynamic ) {
+				// Dynamic accounts are sourced from $dynamic_accounts at render time;
+				// the 'account' here is unused (render_methods_list looks it up by entity).
+				$available_methods[ $entity_key ] = [
+					'method'  => (string) ( $cat_entry['label'] ?? $entity_key ),
+					'account' => '',
+				];
+			} else {
+				$static_method                    = (array) ( $catalog[ $gateway_key ]['methods'][ $entity_key ]
+					?? $catalog[ $gateway_key ]['methods'][ strtolower( $entity_key ) ]
+					?? [] );
+				$available_methods[ $entity_key ] = [
+					'method'  => (string) ( $static_method['method'] ?? $cat_entry['label'] ?? $entity_key ),
+					'account' => (string) ( $static_method['account'] ?? '' ),
+				];
+			}
 		}
 
 		return [ $available_methods, $is_dynamic, $dynamic_accounts ];
@@ -1585,8 +1889,9 @@ class Addon extends \GFPaymentAddOn {
 		$choices = [ [ 'label' => __( '— Select a gateway key —', 'ifthenpay-payments-for-gravityforms' ), 'value' => '' ] ];
 
 		foreach ( $catalog as $key => $gateway ) {
-			$label     = sanitize_text_field( (string) ( $gateway['label'] ?? $key ) );
-			$choices[] = [ 'label' => $label . ' (' . $key . ')', 'value' => $key ];
+			// Alias-only label (drops the technical key); value stays the gateway key.
+			$label     = sanitize_text_field( (string) ( $gateway['label'] ?? $gateway['alias'] ?? $key ) );
+			$choices[] = [ 'label' => $label, 'value' => $key ];
 		}
 
 		return $choices;

@@ -217,3 +217,82 @@
 	.iftp-pbl-public-box     { padding: 12px; }
 	.iftp-pbl-pay-now-button { width: 100%; }
 }
+
+/* -------------------------------------------------------------------------
+   Payment-status banner (Stripe-style)
+   Injected by gform_get_form_filter when the customer returns from the
+   gateway with ?iftp_gf_status=paid|failed|cancelled.
+   ------------------------------------------------------------------------- */
+
+.iftp-gf-payment-banner {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	margin: 0 0 20px;
+	padding: 14px 16px;
+	border-radius: var(--gf-radius, 6px);
+	border: 1px solid transparent;
+	font-size: var(--gf-font-size-secondary, 14px);
+	line-height: 1.4;
+}
+
+.iftp-gf-payment-banner__icon {
+	flex-shrink: 0;
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	background-position: center;
+	background-repeat: no-repeat;
+	background-size: 14px 14px;
+}
+
+.iftp-gf-payment-banner__text {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.iftp-gf-payment-banner__text strong {
+	font-weight: 600;
+}
+
+.iftp-gf-payment-banner.is-success {
+	background: #ecfdf5;
+	border-color: #a7f3d0;
+	color: #065f46;
+}
+.iftp-gf-payment-banner.is-success .iftp-gf-payment-banner__icon {
+	background-color: #10b981;
+	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23fff'><path fill-rule='evenodd' d='M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 011.4-1.4L9 11.6l6.3-6.3a1 1 0 011.4 0z' clip-rule='evenodd'/></svg>");
+}
+
+.iftp-gf-payment-banner.is-error {
+	background: #fef2f2;
+	border-color: #fecaca;
+	color: #991b1b;
+}
+.iftp-gf-payment-banner.is-error .iftp-gf-payment-banner__icon {
+	background-color: #ef4444;
+	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23fff'><path fill-rule='evenodd' d='M4.3 4.3a1 1 0 011.4 0L10 8.6l4.3-4.3a1 1 0 111.4 1.4L11.4 10l4.3 4.3a1 1 0 11-1.4 1.4L10 11.4l-4.3 4.3a1 1 0 11-1.4-1.4L8.6 10 4.3 5.7a1 1 0 010-1.4z' clip-rule='evenodd'/></svg>");
+}
+
+.iftp-gf-payment-banner.is-cancel {
+	background: #fffbeb;
+	border-color: #fde68a;
+	color: #92400e;
+}
+.iftp-gf-payment-banner.is-cancel .iftp-gf-payment-banner__icon {
+	background-color: #f59e0b;
+	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23fff'><path fill-rule='evenodd' d='M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 012 0v4a1 1 0 11-2 0V9zm1-4a1 1 0 100 2 1 1 0 000-2z' clip-rule='evenodd'/></svg>");
+}
+
+/* Pending: payment reference generated, awaiting webhook confirmation */
+.iftp-gf-payment-banner.is-info {
+	background: #eff6ff;
+	border-color: #bfdbfe;
+	color: #1e3a8a;
+}
+.iftp-gf-payment-banner.is-info .iftp-gf-payment-banner__icon {
+	background-color: #3b82f6;
+	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23fff'><path fill-rule='evenodd' d='M10 18a8 8 0 100-16 8 8 0 000 16zm.75-12a.75.75 0 00-1.5 0v4.5l3 1.5a.75.75 0 10.67-1.34l-2.17-1.08V6z' clip-rule='evenodd'/></svg>");
+}

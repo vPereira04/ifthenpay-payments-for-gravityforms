@@ -347,6 +347,41 @@ final class IfthenpayClient {
 		return self::request( 'GET', $url );
 	}
 
+	/**
+	 * Verifies that a Pay-By-Link transaction has actually been paid.
+	 *
+	 * Hits GET /gateway/transaction/status/get?transactionId=...
+	 *  • 200 OK  → returns the response body, e.g. ['TransactionId' => '…', 'PaymentMethod' => 'MBWAY']
+	 *  • 404 Not Found → returns null (transaction exists but payment is NOT yet received)
+	 *  • other HTTP errors → re-throws the RuntimeException so the caller can decide
+	 *
+	 * This is the authoritative "did the customer actually pay" check — the success-URL
+	 * redirect alone is unreliable for asynchronous methods (Multibanco, Payshop) because
+	 * the customer can be redirected back after merely *generating* the payment reference.
+	 */
+	public static function verify_transaction_paid( string $transaction_id ): ?array {
+		$transaction_id = sanitize_text_field( trim( $transaction_id ) );
+		if ( $transaction_id === '' ) {
+			return null;
+		}
+
+		//$transaction_id = 'HWG9lQsKJeLhjYzoCa8U';
+
+		$url = add_query_arg(
+			[ 'transactionId' => $transaction_id ],
+			self::API_BASE . '/gateway/transaction/status/get'
+		);
+
+		try {
+			return self::request( 'GET', $url );
+		} catch ( RuntimeException $e ) {
+			if ( (int) $e->getCode() === 404 ) {
+				return null;
+			}
+			throw $e;
+		}
+	}
+
 	public static function create_payment_link( string $gateway_key, array $payload ): array {
 		$url = rtrim( self::API_BASE, '/' ) . '/gateway/pinpay/' . rawurlencode( $gateway_key );
 
