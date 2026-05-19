@@ -18,12 +18,13 @@ final class IfthenpayPayload {
 			'id'          => $id,
 			'amount'      => self::format_amount( $args['amount'] ?? 0 ),
 			'description' => self::build_description( $id, $description ),
+			'lang'        => self::map_locale_to_lang( (string) ( $args['locale'] ?? get_locale() ) ),
+			'expiredate'  => self::default_expiredate(),
 			'accounts'    => (string) ( $args['accounts'] ?? '' ),
 			'success_url' => $args['success_url'] ?? '',
 			'error_url'   => $args['error_url'] ?? '',
 			'cancel_url'  => $args['cancel_url'] ?? '',
 			'otp'         => 'true',
-			'lang'        => self::map_locale_to_lang( (string) ( $args['locale'] ?? get_locale() ) ),
 		];
 
 		foreach ( [ 'selected_method', 'email', 'name', 'fields' ] as $field ) {
@@ -34,6 +35,13 @@ final class IfthenpayPayload {
 		}
 
 		return $payload;
+	}
+
+	/**
+	 * Default Pay-By-Link expiry: 24 hours from now, formatted as YYYYMMDD.
+	 */
+	public static function default_expiredate( int $days_from_now = 1 ): string {
+		return gmdate( 'Ymd', time() + ( max( 1, $days_from_now ) * DAY_IN_SECONDS ) );
 	}
 
 	public static function map_locale_to_lang( string $locale ): string {
@@ -58,16 +66,22 @@ final class IfthenpayPayload {
 	/**
 	 * Build gateway return URLs for a GravityForms entry.
 	 *
-	 * @return array<string, string>
+	 * Adds query args directly to the page URL where the form was embedded —
+	 * the gateway substitutes `[TRANSACTIONID]` with the real id on redirect.
+	 *
+	 * @return array{success_url:string, error_url:string, cancel_url:string}
 	 */
-	public static function build_gateway_urls( int $entry_id, int $form_id, string $base_url ): array {
-		$common = [ 'entry_id' => $entry_id, 'form_id' => $form_id, 'transaction_id' => '[TRANSACTIONID]', 'iftp_gf' => 1 ];
+	public static function build_gateway_urls( int $payment_id, string $base_url ): array {
+		$common = [
+			'id'             => $payment_id,
+			'transaction_id' => '[TRANSACTIONID]',
+			'iftp_gateway'   => 1,
+		];
 
 		return [
-			'success_url'  => add_query_arg( array_merge( $common, [ 'iftp_gf_return' => 'success' ] ), $base_url ),
-			'error_url'    => add_query_arg( array_merge( $common, [ 'iftp_gf_return' => 'error' ] ), $base_url ),
-			'cancel_url'   => add_query_arg( array_merge( $common, [ 'iftp_gf_return' => 'cancel' ] ), $base_url ),
-			'callback_url' => add_query_arg( [ 'iftp_gf_callback' => 1 ], home_url( '/' ) ),
+			'success_url' => add_query_arg( array_merge( [ 'iftp_gf_pay' => 'success' ], $common ), $base_url ),
+			'error_url'   => add_query_arg( array_merge( [ 'iftp_gf_pay' => 'error'   ], $common ), $base_url ),
+			'cancel_url'  => add_query_arg( array_merge( [ 'iftp_gf_pay' => 'cancel'  ], $common ), $base_url ),
 		];
 	}
 

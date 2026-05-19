@@ -62,22 +62,20 @@ final class IfthenpayReturn {
 	public static function get_return_data_from_request(): array {
 		$query_args = wp_unslash( filter_input_array( INPUT_GET ) ?: [] );
 
-		if ( empty( $query_args ) || empty( $query_args['iftp_gf_return'] ) ) {
+		// Required: iftp_gf_pay status flag + iftp_gateway sentinel
+		// (matches build_gateway_urls()).
+		if ( empty( $query_args ) || empty( $query_args['iftp_gf_pay'] ) || empty( $query_args['iftp_gateway'] ) ) {
 			return [];
 		}
 
 		$return_data = [
-			'iftp_gf_return' => sanitize_text_field( (string) $query_args['iftp_gf_return'] ),
+			'iftp_gf_pay' => sanitize_text_field( (string) $query_args['iftp_gf_pay'] ),
 		];
 
-		$entry_id = isset( $query_args['entry_id'] ) ? absint( $query_args['entry_id'] ) : 0;
+		// `id` is the GF entry ID (passed as $payment_id to build_gateway_urls).
+		$entry_id = isset( $query_args['id'] ) ? absint( $query_args['id'] ) : 0;
 		if ( $entry_id > 0 ) {
 			$return_data['entry_id'] = $entry_id;
-		}
-
-		$form_id = isset( $query_args['form_id'] ) ? absint( $query_args['form_id'] ) : 0;
-		if ( $form_id > 0 ) {
-			$return_data['form_id'] = $form_id;
 		}
 
 		$transaction_id = self::get_return_transaction_id_from_request( $query_args );
@@ -101,7 +99,7 @@ final class IfthenpayReturn {
 			return false;
 		}
 
-		foreach ( [ 'iftp_gf_return', 'status', 'Status', 'payment_status' ] as $key ) {
+		foreach ( [ 'iftp_gf_pay', 'status', 'Status', 'payment_status' ] as $key ) {
 			if ( ! empty( $return_data[ $key ] ) ) {
 				$status = strtolower( sanitize_text_field( (string) $return_data[ $key ] ) );
 				if ( in_array( $status, self::SUCCESS_RETURN_STATUSES, true ) ) {
@@ -117,7 +115,7 @@ final class IfthenpayReturn {
 	 * @param array<string, mixed> $return_data
 	 */
 	public static function get_return_status( array $return_data ): string {
-		foreach ( [ 'iftp_gf_return', 'status', 'Status', 'payment_status' ] as $key ) {
+		foreach ( [ 'iftp_gf_pay', 'status', 'Status', 'payment_status' ] as $key ) {
 			if ( empty( $return_data[ $key ] ) ) {
 				continue;
 			}

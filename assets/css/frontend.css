@@ -81,9 +81,6 @@
 }
 
 .iftp-pbl-logo {
-	border: 1px solid rgb(17 35 55 / 10%);
-	border-radius: var(--gf-radius, 3px);
-	background: #fff;
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -102,11 +99,6 @@
 	max-height: 100%;
 	object-fit: contain;
 	display: block;
-}
-
-.iftp-pbl-method-item.is-default .iftp-pbl-logo {
-	border-color: var(--gf-color-primary, #204ce5);
-	box-shadow: 0 0 0 1px var(--gf-color-primary, #204ce5);
 }
 
 /* ---- Info block ---- */
