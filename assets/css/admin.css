@@ -199,13 +199,8 @@ select option:disabled {
 }
 
 .iftp-gf-method-account-select {
-    font-size: 11px;
-    padding: 3px 4px;
-    border: 1px solid #dcdcde;
-    border-radius: 3px;
-    background: #fff;
-    color: #1d2327;
-    width: 160px;
+    font-size: 12px !important;
+    width: 250px !important;
 }
 
 .iftp-gf-activation-sent,
