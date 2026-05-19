@@ -24,7 +24,7 @@ require_once IFTP_GF_DIR . 'src/Field/GF_Field_Ifthenpay.php';
 class Addon extends \GFPaymentAddOn {
 
 	// -------------------------------------------------------------------------
-	// Properties
+	// Properties 
 	// -------------------------------------------------------------------------
 
 	protected $_version                  = IFTP_GF_VERSION;
