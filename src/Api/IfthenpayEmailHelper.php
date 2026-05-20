@@ -69,7 +69,7 @@ final class IfthenpayEmailHelper {
 			</p>
 		</div>
 		<?php
-		$body = ob_get_clean();
+		$body = (string) ob_get_clean();
 
 		$host    = wp_parse_url( $site_url, PHP_URL_HOST );
 		$headers = [

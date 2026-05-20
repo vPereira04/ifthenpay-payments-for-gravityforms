@@ -23,7 +23,7 @@ class GF_Field_Ifthenpay extends \GF_Field {
 	}
 
 	public function get_form_editor_field_icon(): string {
-		return IFTP_GF_URL . 'assets/images/ifthenpay-small-icon.svg';
+		return \IFTP_GF_URL . 'assets/images/ifthenpay-small-icon.svg';
 	}
 
 	public function get_form_editor_button(): array {
@@ -67,19 +67,22 @@ class GF_Field_Ifthenpay extends \GF_Field {
 		if ( ! wp_style_is( 'ifthenpay-gf-frontend', 'enqueued' ) ) {
 			wp_enqueue_style(
 				'ifthenpay-gf-frontend',
-				IFTP_GF_URL . 'assets/css/frontend.css',
+				\IFTP_GF_URL . 'assets/css/frontend.css',
 				[],
-				IFTP_GF_VERSION
+				\IFTP_GF_VERSION
 			);
 		}
 
 		$form_id   = (int) rgar( $form, 'id' );
 		$form_info = Addon::get_form_payment_info( $form_id );
 
-		$enabled_methods = (array) ( $form_info['enabled_methods'] ?? [] );
-		$default_method  = strtoupper( (string) ( $form_info['default_method'] ?? '' ) );
+		$default_method = strtoupper( (string) ( $form_info['default_method'] ?? '' ) );
+		$active_methods = array_values( array_filter(
+			(array) ( $form_info['pay_methods'] ?? [] ),
+			static fn( array $method ): bool => ! empty( $method['is_active'] )
+		) );
 
-		if ( empty( $enabled_methods ) ) {
+		if ( empty( $active_methods ) ) {
 			$feeds = \GFAPI::get_feeds( null, $form_id, 'iftp_gf' );
 			$has_active_feed = false;
 			if ( is_array( $feeds ) ) {
@@ -110,7 +113,7 @@ class GF_Field_Ifthenpay extends \GF_Field {
 				<!-- Header -->
 				<div class="iftp-pbl-header">
 					<span class="iftp-pbl-header-icon" aria-hidden="true">
-						<img src="<?php echo esc_url( IFTP_GF_URL . 'assets/images/ifthenpay-field-icon.svg' ); ?>" alt="Ifthenpay" width="50" height="50">
+						<img src="<?php echo esc_url( \IFTP_GF_URL . 'assets/images/ifthenpay-field-icon.svg' ); ?>" alt="Ifthenpay" width="50" height="50">
 					</span>
 					<div class="iftp-pbl-header-text">
 						<div class="iftp-pbl-header-title">ifthenpay</div>
@@ -122,13 +125,14 @@ class GF_Field_Ifthenpay extends \GF_Field {
 				<div class="iftp-pbl-methods-section">
 					<div class="iftp-pbl-methods-title"><?php esc_html_e( 'Payment methods:', 'ifthenpay-payments-for-gravityforms' ); ?></div>
 					<div class="iftp-pbl-preview-methods">
-						<?php foreach ( $enabled_methods as $entity_key => $method ) :
+						<?php foreach ( $active_methods as $method ) :
+							$entity_key   = strtoupper( (string) ( $method['entity'] ?? '' ) );
 							$is_default   = ( $entity_key === $default_method );
-							$logo_url     = (string) ( $method['image_url'] ?? '' );
+							$logo_url     = (string) ( $method['img_url'] ?? '' );
 							if ( $logo_url === '' ) {
 								$logo_url = 'https://gateway.ifthenpay.com/plugins/logotipos/small/' . strtolower( $entity_key ) . '.png';
 							}
-							$method_label = (string) ( $method['label'] ?? $entity_key );
+							$method_label = $entity_key;
 						?>
 						<span class="iftp-pbl-method-item<?php echo $is_default ? ' is-default' : ''; ?>" data-entity="<?php echo esc_attr( $entity_key ); ?>">
 							<span class="iftp-pbl-logo">
@@ -184,7 +188,7 @@ class GF_Field_Ifthenpay extends \GF_Field {
 			<div class="iftp-pbl-public-box">
 				<div class="iftp-pbl-header">
 					<span class="iftp-pbl-header-icon" aria-hidden="true">
-						<img src="<?php echo esc_url( IFTP_GF_URL . 'assets/images/ifthenpay-field-icon.svg' ); ?>" alt="Ifthenpay" width="22" height="22">
+						<img src="<?php echo esc_url( \IFTP_GF_URL . 'assets/images/ifthenpay-field-icon.svg' ); ?>" alt="Ifthenpay" width="22" height="22">
 					</span>
 					<div class="iftp-pbl-header-text">
 						<div class="iftp-pbl-header-title">ifthenpay</div>

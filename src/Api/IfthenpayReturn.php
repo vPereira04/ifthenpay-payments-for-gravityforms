@@ -132,12 +132,16 @@ final class IfthenpayReturn {
 			return '';
 		}
 
+		// IfthenpayClient::verify_transaction_paid() returns the body on 200 or
+		// null on 404 — same endpoint we used to call via the old, now-removed
+		// get_payment_method_by_transaction_id() helper.
 		try {
-			$response = IfthenpayClient::get_payment_method_by_transaction_id( $transaction_id );
-			return is_array( $response ) ? self::first_string_value( $response, self::PAYMENT_METHOD_KEYS ) : '';
+			$response = IfthenpayClient::verify_transaction_paid( $transaction_id );
 		} catch ( \RuntimeException ) {
 			return '';
 		}
+
+		return is_array( $response ) ? self::first_string_value( $response, self::PAYMENT_METHOD_KEYS ) : '';
 	}
 
 	/**

@@ -1,3 +1,13 @@
+/**
+ * ifthenpay | Payments for Gravity Forms — Admin JS
+ *
+ * Two responsibilities only:
+ *   1. Connect / Disconnect the Backoffice Key on the Plugin Settings page.
+ *   2. Keep the Default Method dropdown in sync with the methods-table
+ *      checkboxes on the Feed Settings page (purely client-side; the methods
+ *      table is server-rendered on every page load — no AJAX hops).
+ * @param $
+ */
 (function ($) {
 	'use strict';
 
@@ -159,37 +169,39 @@
 	});
 
 	// -------------------------------------------------------------------------
-	// Default method dropdown — sync enabled/disabled state from checkboxes
+	// Feed settings page — keep the Default Method dropdown's options enabled
+	// only while the matching entity checkbox is checked. Purely client-side;
+	// the methods table is rendered server-side on each page load using fresh
+	// API data, so no AJAX hops happen when the admin toggles checkboxes.
 	// -------------------------------------------------------------------------
 
-	/**
-	 * Enable options whose entity is checked, disable the rest.
-	 * The "Auto" option (value="") is always enabled.
-	 * Methods marked is-unavailable in the table can never be enabled.
-	 */
 	function syncDefaultMethodDropdown() {
 		const $select = $('[name="_gform_setting_default_method"]');
-		if (!$select.length) return;
+		if (!$select.length) {
+			return;
+		}
 
-		// Build a map: entity → true (enabled) | false (disabled).
+		// Build a map: entity → true (checked) | false (unchecked).
 		const enabled = {};
-		$('#iftp-gf-methods-table-wrapper .iftp-gf-method-toggle').each(function () {
-			const entity      = ($(this).data('entity') || '').toUpperCase();
-			const isChecked   = $(this).is(':checked');
-			const unavailable = $(this).closest('.iftp-gf-method-item').hasClass('is-unavailable');
-			enabled[entity]   = isChecked && !unavailable;
-		});
+		$('#iftp-gf-methods-table-wrapper .iftp-gf-method-toggle').each(
+			function () {
+				const entity = ($(this).data('entity') || '').toUpperCase();
+				enabled[entity] = $(this).is(':checked');
+			}
+		);
 
 		$select.find('option').each(function () {
 			const val = $(this).val();
-			if (val === '') return; // "Auto" always selectable
+			if (val === '') {
+				return; // "Auto" placeholder is always selectable.
+			}
 			const entity = val.toUpperCase();
 			if (Object.prototype.hasOwnProperty.call(enabled, entity)) {
 				$(this).prop('disabled', !enabled[entity]);
 			}
 		});
 
-		// If the currently-selected value just became disabled, reset to Auto.
+		// If the currently-selected default just became disabled, reset to Auto.
 		const current = $select.val();
 		if (
 			current !== '' &&
@@ -199,7 +211,6 @@
 		}
 	}
 
-	// Re-sync whenever a method checkbox changes.
 	$(document).on(
 		'change',
 		'#iftp-gf-methods-table-wrapper .iftp-gf-method-toggle',
@@ -207,84 +218,182 @@
 	);
 
 	// -------------------------------------------------------------------------
-	// Feed settings page — gateway methods table
+	// Feed settings page — gateway dropdown change → rebuild methods table
+	// client-side from window.iftpGfFeedData (injected by PHP on page load).
+	// Zero API hits — the feed data is everything we need.
 	// -------------------------------------------------------------------------
 
-	const iftpGfFeedSettings = {
-		onGatewayKeyChange(selectEl) {
-			const gatewayKey = $(selectEl).val();
-			const $wrapper = $('#iftp-gf-methods-table-wrapper');
-			const feedNonce = $wrapper.data('nonce') || nonce;
+	function escapeHtml(str) {
+		return String(str == null ? '' : str)
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#039;');
+	}
 
-			if (!gatewayKey) {
-				$wrapper.html(
-					'<p class="iftp-gf-no-methods">' +
-						(strings.loading_methods ||
-							'Select a gateway key to load methods.') +
-						'</p>'
+	function renderMethodsListHtml(gatewayKey, feedData) {
+		if (!feedData || !Array.isArray(feedData.methods)) {
+			return '';
+		}
+		const accounts = feedData.gatewayAccounts[gatewayKey] || {};
+
+		const items = feedData.methods
+			.map(function (m) {
+				const account = accounts[m.entity] || '';
+				const isProvisioned = account !== '';
+				const isWideLogo = m.entity === 'CCARD';
+				const itemClasses =
+					'iftp-gf-method-item' +
+					(isProvisioned ? '' : ' is-unactivated');
+
+				const checkbox =
+					'<input type="checkbox" ' +
+					'name="_gform_setting_methods_config[' +
+					escapeHtml(m.entity) +
+					'][enabled]" value="1" class="iftp-gf-method-toggle" ' +
+					'data-entity="' +
+					escapeHtml(m.entity) +
+					'"' +
+					(isProvisioned ? '' : ' disabled') +
+					' />';
+
+				const hidden =
+					'<input type="hidden" ' +
+					'name="_gform_setting_methods_config[' +
+					escapeHtml(m.entity) +
+					'][account]" value="' +
+					escapeHtml(account) +
+					'" />';
+
+				const right = isProvisioned
+					? '<code class="iftp-gf-account-code">' +
+						escapeHtml(account) +
+						'</code><span class="iftp-gf-active-badge" title="' +
+						escapeHtml(feedData.strings.provisioned) +
+						'">&#10003;</span>'
+					: '<em class="iftp-gf-no-account">' +
+						escapeHtml(feedData.strings.notActivated) +
+						'</em><button type="button" class="button button-small iftp-gf-activate-method" data-entity="' +
+						escapeHtml(m.entity) +
+						'" data-gateway-key="' +
+						escapeHtml(gatewayKey) +
+						'">' +
+						escapeHtml(feedData.strings.requestActivation) +
+						'</button>';
+
+				return (
+					'<div class="' +
+					itemClasses +
+					'" data-entity="' +
+					escapeHtml(m.entity) +
+					'">' +
+					'<label class="iftp-gf-method-item-label">' +
+					checkbox +
+					hidden +
+					'<span class="iftp-gf-method-icon-wrap' +
+					(isWideLogo ? ' is-wide' : '') +
+					'"><img src="' +
+					escapeHtml(m.img_url) +
+					'" alt="' +
+					escapeHtml(m.label) +
+					'" loading="lazy" /></span>' +
+					'<span class="iftp-gf-method-name">' +
+					escapeHtml(m.label) +
+					'</span>' +
+					'</label>' +
+					'<div class="iftp-gf-method-right">' +
+					right +
+					'</div>' +
+					'</div>'
 				);
-				// Clear the dropdown to just "Auto" when no gateway is selected.
-				updateDefaultMethodSelect('<option value="">' +
-					(strings.auto_method || '— Auto (first enabled method) —') +
-					'</option>');
-				return;
-			}
+			})
+			.join('');
 
-			$wrapper.html(
-				'<p class="iftp-gf-loading">' +
-					(strings.loading_methods || 'Loading methods...') +
-					'</p>'
-			);
+		return '<div class="iftp-gf-methods-list">' + items + '</div>';
+	}
 
-			$.post(
-				ajaxUrl,
-				{
-					action: 'iftp_gf_load_gateway_methods',
-					nonce: feedNonce,
-					gateway_key: gatewayKey,
-				},
-				null,
-				'json'
-			)
-				.done(function (res) {
-					if (res && res.success && res.data && res.data.html) {
-						$wrapper.html(res.data.html);
-
-						// Update the default-method dropdown options from the
-						// server-rendered HTML, then sync disabled states.
-						if (res.data.default_method_options) {
-							updateDefaultMethodSelect(res.data.default_method_options);
-						}
-						syncDefaultMethodDropdown();
-					} else {
-						$wrapper.html(
-							'<p class="iftp-gf-no-methods">No methods found for this gateway key.</p>'
-						);
-					}
-				})
-				.fail(function () {
-					$wrapper.html(
-						'<p class="iftp-gf-error">Failed to load methods. Please try again.</p>'
-					);
-				});
-		},
-	};
-
-	/**
-	 * Replace all <option> elements inside the default_method <select>.
-	 * @param {string} optionsHtml  Raw HTML of <option> elements.
-	 */
-	function updateDefaultMethodSelect(optionsHtml) {
+	function rebuildDefaultMethodDropdown(gatewayKey, feedData) {
 		const $select = $('[name="_gform_setting_default_method"]');
-		if ($select.length) {
-			$select.html(optionsHtml);
+		if (!$select.length || !feedData) {
+			return;
+		}
+		const accounts = feedData.gatewayAccounts[gatewayKey] || {};
+		const currentVal = $select.val();
+
+		let html =
+			'<option value="">' +
+			escapeHtml(feedData.strings.autoMethod) +
+			'</option>';
+		feedData.methods.forEach(function (m) {
+			// List every visible method that's provisioned on this gateway —
+			// allow_default is no longer filtered here so all methods are
+			// surfaced. syncDefaultMethodDropdown() then disables the ones
+			// whose checkbox isn't active.
+			if (!accounts[m.entity]) {
+				return; // not provisioned on this gateway
+			}
+			html +=
+				'<option value="' +
+				escapeHtml(m.entity) +
+				'">' +
+				escapeHtml(m.label) +
+				'</option>';
+		});
+		$select.html(html);
+
+		// If the previous selection still exists on the new gateway, keep it.
+		if (
+			currentVal &&
+			$select.find('option[value="' + currentVal + '"]').length
+		) {
+			$select.val(currentVal);
 		}
 	}
 
-	window.iftpGfFeedSettings = iftpGfFeedSettings;
+	$(document).on(
+		'change',
+		'select[name="_gform_setting_gateway_key"]',
+		function () {
+			const feedData = window.iftpGfFeedData;
+			if (!feedData) {
+				return;
+			}
+			const newKey = $(this).val() || '';
+			const $wrapper = $('#iftp-gf-methods-table-wrapper');
+			if (!$wrapper.length) {
+				return;
+			}
+
+			if (!newKey) {
+				$wrapper.html(
+					'<p class="iftp-gf-no-methods">' +
+						escapeHtml(feedData.strings.selectGateway) +
+						'</p>'
+				);
+			} else {
+				const listHtml = renderMethodsListHtml(newKey, feedData);
+				$wrapper.html(
+					listHtml ||
+						'<p class="iftp-gf-no-methods">' +
+							escapeHtml(feedData.strings.noMethods) +
+							'</p>'
+				);
+			}
+
+			rebuildDefaultMethodDropdown(newKey, feedData);
+			syncDefaultMethodDropdown();
+		}
+	);
 
 	// -------------------------------------------------------------------------
-	// Feed settings page — activate payment method
+	// Feed settings page — Activate Method
+	//
+	// For methods that exist in the catalog (IsVisible=true) but aren't
+	// provisioned on the currently-selected gateway, the methods table renders
+	// a "Request Activation" button instead of an account code. Clicking it
+	// hits the server endpoint, which sends an activation email via
+	// IfthenpayEmailHelper. 24h cooldown is enforced server-side.
 	// -------------------------------------------------------------------------
 
 	$(document).on('click', '.iftp-gf-activate-method', function (e) {
@@ -293,16 +402,16 @@
 		const $btn = $(this);
 		const entity = $btn.data('entity');
 		const gatewayKey = $btn.data('gateway-key');
-		const $wrapper = $('#iftp-gf-methods-table-wrapper');
-		const feedNonce = $wrapper.data('nonce') || nonce;
 
-		$btn.prop('disabled', true).text('Sending...');
+		$btn.prop('disabled', true).text(
+			strings.activation_sending || 'Sending...'
+		);
 
 		$.post(
 			ajaxUrl,
 			{
 				action: 'iftp_gf_activate_method',
-				nonce: feedNonce,
+				nonce: connectionNonce(),
 				entity,
 				gateway_key: gatewayKey,
 			},
@@ -329,7 +438,9 @@
 				}
 			})
 			.fail(function () {
-				$btn.prop('disabled', false).text('Request Activation');
+				$btn.prop('disabled', false).text(
+					strings.activation_button || 'Request Activation'
+				);
 			});
 	});
 

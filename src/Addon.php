@@ -14,12 +14,12 @@ use Ifthenpay\GravityForms\Api\IfthenpayEmailHelper;
 use Ifthenpay\GravityForms\Api\IfthenpayPayload;
 use Ifthenpay\GravityForms\Api\IfthenpayReturn;
 
-require_once IFTP_GF_DIR . 'src/Api/IfthenpayClient.php';
-require_once IFTP_GF_DIR . 'src/Api/IfthenpayPayload.php';
-require_once IFTP_GF_DIR . 'src/Api/IfthenpayReturn.php';
-require_once IFTP_GF_DIR . 'src/Api/IfthenpayEmailHelper.php';
-require_once IFTP_GF_DIR . 'src/Api/GFFormData.php';
-require_once IFTP_GF_DIR . 'src/Field/GF_Field_Ifthenpay.php';
+require_once \IFTP_GF_DIR . 'src/Api/IfthenpayClient.php';
+require_once \IFTP_GF_DIR . 'src/Api/IfthenpayPayload.php';
+require_once \IFTP_GF_DIR . 'src/Api/IfthenpayReturn.php';
+require_once \IFTP_GF_DIR . 'src/Api/IfthenpayEmailHelper.php';
+require_once \IFTP_GF_DIR . 'src/Api/GFFormData.php';
+require_once \IFTP_GF_DIR . 'src/Field/GF_Field_Ifthenpay.php';
 
 class Addon extends \GFPaymentAddOn {
 
@@ -27,7 +27,7 @@ class Addon extends \GFPaymentAddOn {
 	// Properties
 	// -------------------------------------------------------------------------
 
-	protected $_version                  = IFTP_GF_VERSION;
+	protected $_version                  = \IFTP_GF_VERSION;
 	protected $_min_gravityforms_version = '2.5';
 	protected $_slug                     = 'iftp_gf';
 	protected $_path                     = 'ifthenpay-payments-for-gravityforms/ifthenpay-payments-for-gravityforms.php';
@@ -39,17 +39,15 @@ class Addon extends \GFPaymentAddOn {
 
 	private static ?self $_instance = null;
 
-	private const OPTION_BACKOFFICE_KEY  = 'iftp_gf_backofficekey';
-	private const OPTION_GATEWAY_CATALOG = 'iftp_gf_gateway_catalog';
-	private const OPTION_METHOD_CATALOG  = 'iftp_gf_method_catalog';
+	private const OPTION_BACKOFFICE_KEY = 'iftp_gf_backofficekey';
 
-	/** WP option prefix for per-form resolved payment info (suffix = form ID). */
+	/** WP option prefix for the per-form payment snapshot (suffix = form ID). */
 	private const OPTION_FORM_INFO_PREFIX = 'ifthenpay_gf_form_';
 
-	/** Transient that signals the gateway catalog is still fresh (kept for cleanup on disconnect). */
-	private const TRANSIENT_CATALOG_FRESH = 'iftp_gf_catalog_fresh';
+	/** Restrict gateway-key listings to the "GravityForms" type only. */
+	private const GATEWAY_TYPE = 'GravityForms';
 
-	private const SIGNUP_URL             = 'https://ifthenpay.com';
+	private const SIGNUP_URL = 'https://ifthenpay.com';
 
 	// -------------------------------------------------------------------------
 	// Singleton
@@ -92,7 +90,6 @@ class Addon extends \GFPaymentAddOn {
 
 	public function init_admin(): void {
 		parent::init_admin();
-		$this->load_catalogs_if_empty();
 		add_action( 'admin_notices', [ $this, 'render_admin_notices' ] );
 
 		// The block editor (Gutenberg) renders the GF form-preview block inside
@@ -109,67 +106,26 @@ class Addon extends \GFPaymentAddOn {
 	public function enqueue_block_editor_styles(): void {
 		wp_enqueue_style(
 			'ifthenpay-gf-frontend',
-			IFTP_GF_URL . 'assets/css/frontend.css',
+			\IFTP_GF_URL . 'assets/css/frontend.css',
 			[],
-			IFTP_GF_VERSION
+			\IFTP_GF_VERSION
 		);
 	}
 
 	public function init_ajax(): void {
 		parent::init_ajax();
 
+		// Three AJAX endpoints. The Feed Settings page renders synchronously
+		// (no AJAX hops for the methods table), but Connect/Disconnect/Activate
+		// still need server round-trips:
+		//   - connect_backoffice   → validate the key, save it.
+		//   - disconnect_backoffice → drop key + per-form snapshots.
+		//   - activate_method      → email support to request activation of a
+		//     payment method that's visible in the catalog but not yet
+		//     provisioned on the selected GravityForms-type gateway.
 		add_action( 'wp_ajax_iftp_gf_connect_backoffice',    [ $this, 'ajax_connect_backoffice' ] );
 		add_action( 'wp_ajax_iftp_gf_disconnect_backoffice', [ $this, 'ajax_disconnect_backoffice' ] );
-		add_action( 'wp_ajax_iftp_gf_load_gateway_methods',  [ $this, 'ajax_load_gateway_methods' ] );
 		add_action( 'wp_ajax_iftp_gf_activate_method',       [ $this, 'ajax_activate_payment_method' ] );
-	}
-
-	// -------------------------------------------------------------------------
-	// Lazy catalog loader (runs on admin pages when options are empty)
-	// -------------------------------------------------------------------------
-
-	/**
-	 * Fetches and stores both catalogs when they are absent.
-	 * Called from init_admin() — fires once per admin request, not on every
-	 * feed-settings page specifically.  The actual freshness gate is simply
-	 * "are the options populated?", so no transients are needed.
-	 */
-	private function load_catalogs_if_empty(): void {
-		$backoffice_key = self::get_backoffice_key();
-		if ( $backoffice_key === '' ) {
-			return;
-		}
-
-		$gateway_catalog_empty = empty( self::get_gateway_catalog() );
-		$method_catalog_empty  = empty( self::get_method_catalog() );
-
-		if ( ! $gateway_catalog_empty && ! $method_catalog_empty ) {
-			return; // Both already populated — nothing to do.
-		}
-
-		try {
-			$raw_methods = IfthenpayClient::get_cached_available_methods();
-
-			if ( $method_catalog_empty && ! empty( $raw_methods ) ) {
-				update_option(
-					self::OPTION_METHOD_CATALOG,
-					IfthenpayClient::build_method_catalog_from_raw( $raw_methods ),
-					false
-				);
-			}
-
-			if ( $gateway_catalog_empty ) {
-				$gateways = ( new IfthenpayClient( $backoffice_key ) )->get_gateway_catalog(
-					is_array( $raw_methods ) ? $raw_methods : []
-				);
-				if ( ! empty( $gateways ) ) {
-					update_option( self::OPTION_GATEWAY_CATALOG, $gateways, false );
-				}
-			}
-		} catch ( \Throwable ) {
-			// Silently fail — the feed-settings page will show an empty dropdown
-			// and the admin can retry by reloading the page.
-		}
 	}
 
 	// -------------------------------------------------------------------------
@@ -180,8 +136,8 @@ class Addon extends \GFPaymentAddOn {
 		$scripts = [
 			[
 				'handle'  => 'ifthenpay_gf_admin',
-				'src'     => IFTP_GF_URL . 'assets/js/admin.js',
-				'version' => IFTP_GF_VERSION,
+				'src'     => \IFTP_GF_URL . 'assets/js/admin.js',
+				'version' => \IFTP_GF_VERSION,
 				'deps'    => [ 'jquery' ],
 				'strings' => [
 					'ajax_url'            => admin_url( 'admin-ajax.php' ),
@@ -191,7 +147,8 @@ class Addon extends \GFPaymentAddOn {
 					'connect'             => __( 'Connect', 'ifthenpay-payments-for-gravityforms' ),
 					'disconnect'          => __( 'Disconnect', 'ifthenpay-payments-for-gravityforms' ),
 					'generic_error'       => __( 'Request failed. Please try again.', 'ifthenpay-payments-for-gravityforms' ),
-					'loading_methods'     => __( 'Loading methods...', 'ifthenpay-payments-for-gravityforms' ),
+					'activation_button'   => __( 'Request Activation', 'ifthenpay-payments-for-gravityforms' ),
+					'activation_sending'  => __( 'Sending...', 'ifthenpay-payments-for-gravityforms' ),
 					'activation_sent'     => __( 'Activation request sent.', 'ifthenpay-payments-for-gravityforms' ),
 					'activation_cooldown' => __( 'Request already sent. Please wait 24 hours.', 'ifthenpay-payments-for-gravityforms' ),
 				],
@@ -209,8 +166,8 @@ class Addon extends \GFPaymentAddOn {
 		$styles = [
 			[
 				'handle'  => 'ifthenpay-gf-admin',
-				'src'     => IFTP_GF_URL . 'assets/css/admin.css',
-				'version' => IFTP_GF_VERSION,
+				'src'     => \IFTP_GF_URL . 'assets/css/admin.css',
+				'version' => \IFTP_GF_VERSION,
 				'enqueue' => [
 					[ 'admin_page' => [ 'plugin_settings' ] ],
 					[ 'admin_page' => [ 'form_settings' ], 'tab' => $this->_slug ],
@@ -218,8 +175,8 @@ class Addon extends \GFPaymentAddOn {
 			],
 			[
 				'handle'  => 'ifthenpay-gf-frontend',
-				'src'     => IFTP_GF_URL . 'assets/css/frontend.css',
-				'version' => IFTP_GF_VERSION,
+				'src'     => \IFTP_GF_URL . 'assets/css/frontend.css',
+				'version' => \IFTP_GF_VERSION,
 				'enqueue' => [
 					[ 'field_types' => [ 'iftp_pbl' ] ],
 				],
@@ -297,7 +254,7 @@ class Addon extends \GFPaymentAddOn {
 
 		<input type="hidden" id="iftp-gf-nonce" value="<?php echo esc_attr( $nonce ); ?>">
 		<?php
-		$html = ob_get_clean();
+		$html = (string) ob_get_clean();
 
 		if ( $echo ) {
 			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Sanitized via static kses_admin_html().
@@ -328,9 +285,8 @@ class Addon extends \GFPaymentAddOn {
 						'label'   => __( 'Gateway Key', 'ifthenpay-payments-for-gravityforms' ),
 						'type'    => 'select',
 						'name'    => 'gateway_key',
-						'tooltip' => __( 'Select the ifthenpay gateway key for this form.', 'ifthenpay-payments-for-gravityforms' ),
+						'tooltip' => __( 'Select the ifthenpay gateway key for this form. After changing the selection, click "Update Settings" to load the methods provisioned on that gateway.', 'ifthenpay-payments-for-gravityforms' ),
 						'choices' => $this->get_gateway_key_choices(),
-						'onchange' => 'iftpGfFeedSettings.onGatewayKeyChange(this)',
 					],
 					[
 						'label'    => __( 'Payment Methods', 'ifthenpay-payments-for-gravityforms' ),
@@ -347,34 +303,6 @@ class Addon extends \GFPaymentAddOn {
 						'choices' => $this->get_default_method_choices(),
 					],
 					[
-						'label'         => __( 'Payment Amount Source', 'ifthenpay-payments-for-gravityforms' ),
-						'type'          => 'select',
-						'name'          => 'payment_amount_source',
-						'tooltip'       => __( 'Where does the amount to charge come from? Forms without a pricing field need a Fixed amount or a Specific field.', 'ifthenpay-payments-for-gravityforms' ),
-						'default_value' => 'form_total',
-						'choices'       => [
-							[ 'label' => __( 'Form total (auto-detect pricing fields)', 'ifthenpay-payments-for-gravityforms' ), 'value' => 'form_total' ],
-							[ 'label' => __( 'Specific form field', 'ifthenpay-payments-for-gravityforms' ), 'value' => 'field' ],
-							[ 'label' => __( 'Fixed amount', 'ifthenpay-payments-for-gravityforms' ), 'value' => 'fixed' ],
-						],
-					],
-					[
-						'label'      => __( 'Amount Field', 'ifthenpay-payments-for-gravityforms' ),
-						'type'       => 'select',
-						'name'       => 'payment_amount_field',
-						'tooltip'    => __( 'Pick the form field whose value will be charged. Number, product, and total fields are listed.', 'ifthenpay-payments-for-gravityforms' ),
-						'choices'    => $this->get_amount_field_choices(),
-						'dependency' => [ 'live' => true, 'fields' => [ [ 'field' => 'payment_amount_source', 'values' => [ 'field' ] ] ] ],
-					],
-					[
-						'label'      => __( 'Fixed Amount (EUR)', 'ifthenpay-payments-for-gravityforms' ),
-						'type'       => 'text',
-						'name'       => 'payment_amount_fixed',
-						'class'      => 'small',
-						'tooltip'    => __( 'Charge every submission this exact amount (e.g. 12.50).', 'ifthenpay-payments-for-gravityforms' ),
-						'dependency' => [ 'live' => true, 'fields' => [ [ 'field' => 'payment_amount_source', 'values' => [ 'fixed' ] ] ] ],
-					],
-					[
 						'label'   => __( 'Payment Description', 'ifthenpay-payments-for-gravityforms' ),
 						'type'    => 'text',
 						'name'    => 'description',
@@ -387,211 +315,246 @@ class Addon extends \GFPaymentAddOn {
 	}
 
 	/**
-	 * Returns numeric form fields suitable for use as the payment amount.
-	 */
-	private function get_amount_field_choices(): array {
-		$choices = [ [ 'label' => __( '— Select a field —', 'ifthenpay-payments-for-gravityforms' ), 'value' => '' ] ];
-
-		$form_id = absint( rgget( 'id' ) );
-		if ( $form_id <= 0 ) {
-			return $choices;
-		}
-
-		$form = \GFAPI::get_form( $form_id );
-		if ( ! is_array( $form ) ) {
-			return $choices;
-		}
-
-		$valid_types = [ 'number', 'total', 'product', 'singleproduct', 'singleshipping', 'shipping', 'price', 'hiddenproduct', 'calculation' ];
-
-		foreach ( $form['fields'] ?? [] as $field ) {
-			$type = (string) ( $field->type ?? '' );
-			if ( ! in_array( $type, $valid_types, true ) ) {
-				continue;
-			}
-			$choices[] = [
-				'label' => \GFCommon::get_label( $field ) . ' (' . $type . ')',
-				'value' => (string) $field->id,
-			];
-		}
-
-		return $choices;
-	}
-
-	/**
 	 * Custom settings field renderer for the payment methods list (feed settings page).
 	 */
 	public function settings_iftp_gf_methods_table( mixed $_field, bool $echo = true ): string {
-		$feed        = $this->get_active_feed_for_settings();
 		$gateway_key = (string) ( $this->get_setting( 'gateway_key' ) ?? '' );
-		$catalog     = self::get_gateway_catalog();
-		$nonce       = wp_create_nonce( 'iftp_gf_admin' );
 
-		$methods_config = [];
-		if ( $feed && ! empty( $feed['meta']['methods_config'] ) ) {
-			$raw            = $feed['meta']['methods_config'];
-			$methods_config = is_string( $raw ) ? (array) json_decode( $raw, true ) : (array) $raw;
-		}
+		// Pre-fetched method list (one row per IsVisible method with an account on
+		// the selected gateway row), plus the current admin's checkbox state from
+		// the saved feed meta — both used by render_methods_list().
+		$methods         = $this->build_method_rows_for_gateway( $gateway_key );
+		$methods_config  = $this->read_methods_config_from_active_feed();
 
-		[ $available_methods, $is_dynamic, $dynamic_accounts ] =
-			$this->resolve_available_methods( $gateway_key, $catalog );
+		// Inline-attach the full per-gateway method/account map so the dropdown
+		// onchange handler can rebuild the table client-side without any extra
+		// HTTP round-trips. wp_add_inline_script() injects BEFORE the admin.js
+		// handle, so window.iftpGfFeedData is defined by the time admin.js runs.
+		$this->inject_feed_settings_client_data();
 
 		ob_start();
 		?>
-		<div id="iftp-gf-methods-table-wrapper" data-nonce="<?php echo esc_attr( $nonce ); ?>">
-			<?php if ( empty( $available_methods ) ) : ?>
+		<div id="iftp-gf-methods-table-wrapper">
+			<?php if ( $gateway_key === '' ) : ?>
 				<p class="iftp-gf-no-methods">
-					<?php
-					if ( $gateway_key === '' ) {
-						esc_html_e( 'Select a gateway key above to load available payment methods.', 'ifthenpay-payments-for-gravityforms' );
-					} elseif ( $is_dynamic ) {
-						esc_html_e( 'No accounts found for this gateway. Please contact ifthenpay support.', 'ifthenpay-payments-for-gravityforms' );
-					} else {
-						esc_html_e( 'No payment methods found for this gateway key.', 'ifthenpay-payments-for-gravityforms' );
-					}
-					?>
+					<?php esc_html_e( 'Select a gateway key above to load available payment methods.', 'ifthenpay-payments-for-gravityforms' ); ?>
+				</p>
+			<?php elseif ( empty( $methods ) ) : ?>
+				<p class="iftp-gf-no-methods">
+					<?php esc_html_e( 'No payment methods are provisioned on this gateway.', 'ifthenpay-payments-for-gravityforms' ); ?>
 				</p>
 			<?php else : ?>
-				<?php $this->render_methods_list( $available_methods, $methods_config, $gateway_key, $is_dynamic, $dynamic_accounts ); ?>
+				<?php $this->render_methods_list( $methods, $methods_config ); ?>
 			<?php endif; ?>
 		</div>
 		<?php
-		$html = ob_get_clean();
+		$html = (string) ob_get_clean();
 
 		if ( $echo ) {
-			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Sanitized via static kses_admin_html().
-			echo $this->kses_admin_html( $html );
+			echo self::kses_admin_html( $html );
 		}
 
 		return $html;
 	}
 
-	private function render_methods_list(
-		array $available_methods,
-		array $methods_config,
-		string $gateway_key,
-		bool $is_dynamic = false,
-		array $dynamic_accounts = []
-	): void {
-		$keyed_catalog = self::get_keyed_method_catalog();
+	/**
+	 * Attaches `window.iftpGfFeedData` to the admin.js handle. The JS uses it
+	 * to rebuild the methods table client-side when the gateway dropdown
+	 * changes — zero extra API hits, the page-load fetches are the entirety
+	 * of the data we need.
+	 *
+	 * Shape:
+	 *   {
+	 *     methods: [
+	 *       { entity: 'MBWAY', label: 'MBWAY', img_url: '…', allow_default: true }
+	 *     ],
+	 *     gatewayAccounts: { 'XXX-123456': { MBWAY: 'MBWAY-1234', CCARD: 'CCARD-5' }, ... },
+	 *     strings: { selectGateway, noMethods, notActivated, requestActivation,
+	 *                provisioned, autoMethod }
+	 *   }
+	 */
+	private function inject_feed_settings_client_data(): void {
+		static $injected = false;
+		if ( $injected ) {
+			return;
+		}
+		$injected = true;
+
+		$visible = $this->fetch_visible_methods_keyed();
+
+		$methods = [];
+		foreach ( $visible as $entity => $cat_entry ) {
+			$small_url = (string) ( $cat_entry['small_image_url'] ?? '' );
+			$full_url  = (string) ( $cat_entry['image_url'] ?? '' );
+			$methods[] = [
+				'entity'        => $entity,
+				'label'         => (string) ( $cat_entry['label'] ?? $entity ),
+				'img_url'       => $small_url !== '' ? $small_url : ( $full_url !== '' ? $full_url : 'https://gateway.ifthenpay.com/plugins/logotipos/small/' . strtolower( $entity ) . '.png' ),
+				'allow_default' => (bool) ( $cat_entry['allow_selected_method'] ?? true ),
+			];
+		}
+
+		$gateway_accounts = [];
+		foreach ( $this->fetch_gravityforms_gateways() as $row ) {
+			$key = (string) ( $row['GatewayKey'] ?? '' );
+			if ( $key === '' ) {
+				continue;
+			}
+			$entries = [];
+			foreach ( $visible as $entity => $cat_entry ) {
+				$account = $this->resolve_account_in_row( $row, $entity, (string) ( $cat_entry['label'] ?? '' ) );
+				if ( $account !== '' ) {
+					$entries[ $entity ] = $account;
+				}
+			}
+			$gateway_accounts[ $key ] = $entries;
+		}
+
+		$data = [
+			'methods'         => $methods,
+			'gatewayAccounts' => $gateway_accounts,
+			'strings'         => [
+				'selectGateway'     => __( 'Select a gateway key above to load available payment methods.', 'ifthenpay-payments-for-gravityforms' ),
+				'noMethods'         => __( 'No payment methods are provisioned on this gateway.', 'ifthenpay-payments-for-gravityforms' ),
+				'notActivated'      => __( 'Not activated', 'ifthenpay-payments-for-gravityforms' ),
+				'requestActivation' => __( 'Request Activation', 'ifthenpay-payments-for-gravityforms' ),
+				'provisioned'       => __( 'Provisioned', 'ifthenpay-payments-for-gravityforms' ),
+				'autoMethod'        => __( '— Auto (first enabled method) —', 'ifthenpay-payments-for-gravityforms' ),
+			],
+		];
+
+		wp_add_inline_script(
+			'ifthenpay_gf_admin',
+			'window.iftpGfFeedData = ' . wp_json_encode( $data ) . ';',
+			'before'
+		);
+	}
+
+	/**
+	 * Reads the methods_config sub-array from the currently-edited feed (if any).
+	 * That's what carries the admin's checkbox state across renders.
+	 *
+	 * @return array<string, array<string, mixed>>
+	 */
+	private function read_methods_config_from_active_feed(): array {
+		$feed = $this->get_active_feed_for_settings();
+		if ( $feed === null || empty( $feed['meta']['methods_config'] ) ) {
+			return [];
+		}
+		$raw = $feed['meta']['methods_config'];
+		return is_string( $raw ) ? (array) json_decode( $raw, true ) : (array) $raw;
+	}
+
+	/**
+	 * Builds the renderable list of payment methods for a given gateway key by
+	 * joining the fresh available-methods catalog (visible only) against the
+	 * gateway's row (which carries the per-method account values).
+	 *
+	 * Each row: [ 'entity' => 'MBWAY', 'label' => 'MBWAY', 'account' => 'MBWAY-1234', 'image_url' => '…' ]
+	 *
+	 * @return array<int, array<string, string>>
+	 */
+	private function build_method_rows_for_gateway( string $gateway_key ): array {
+		if ( $gateway_key === '' ) {
+			return [];
+		}
+
+		$row = $this->find_gateway_row( $gateway_key );
+		if ( $row === null ) {
+			return [];
+		}
+
+		$rows = [];
+		foreach ( $this->fetch_visible_methods_keyed() as $entity => $cat_entry ) {
+			$rows[] = [
+				'entity'    => $entity,
+				'label'     => (string) ( $cat_entry['label'] ?? $entity ),
+				// Non-provisioned methods (account === '') still appear in the
+				// feed-settings table so the admin can request activation via
+				// IfthenpayEmailHelper. They are filtered out of the saved
+				// per-form snapshot (see sync_form_payment_info()).
+				'account'   => $this->resolve_account_in_row( $row, $entity, (string) ( $cat_entry['label'] ?? '' ) ),
+				// User explicitly wants the small SVG/PNG (40-60px) here, not
+				// the full-size logo. Fall back to ImageUrl only if missing.
+				'image_url' => (string) ( $cat_entry['small_image_url'] ?? $cat_entry['image_url'] ?? '' ),
+				// `position` is what /gateway/pinpay expects as `selected_method`
+				// — saving it on the snapshot lets redirect_url() emit the
+				// correct integer without re-fetching the methods catalog.
+				'position'  => (int) ( $cat_entry['position'] ?? 0 ),
+			];
+		}
+
+		return $rows;
+	}
+
+	/**
+	 * Renders the methods table inside the feed-settings page. Static-only,
+	 * one row per provisioned method, checkbox bound to is_active.
+	 *
+	 * @param array<int, array<string, string>>           $methods
+	 * @param array<string, array<string, mixed>>         $methods_config
+	 */
+	private function render_methods_list( array $methods, array $methods_config ): void {
+		// We need to know which gateway is currently selected so the Activate
+		// button can pass it to IfthenpayEmailHelper (the activation email tells
+		// support which gateway needs the method provisioned).
+		$gateway_key = (string) ( $this->get_setting( 'gateway_key' ) ?? '' );
 		?>
 		<div class="iftp-gf-methods-list">
-			<?php foreach ( $available_methods as $entity => $method ) : ?>
-				<?php
-				$entity_key    = strtoupper( (string) $entity );
-				$is_enabled    = ! empty( $methods_config[ $entity_key ]['enabled'] );
-				$saved_account = (string) ( $methods_config[ $entity_key ]['account'] ?? '' );
-				$method_label  = (string) ( $method['method'] ?? $entity_key );
+			<?php foreach ( $methods as $method ) :
+				$entity_key    = $method['entity'];
+				$method_label  = $method['label'];
+				$account       = $method['account'];
+				$is_provisioned = ( $account !== '' );
+				$logo_url      = $method['image_url'] !== ''
+					? $method['image_url']
+					: 'https://gateway.ifthenpay.com/plugins/logotipos/small/' . strtolower( $entity_key ) . '.png';
+				// A method can only be enabled if it's provisioned on this gateway.
+				$is_enabled    = $is_provisioned && ! empty( $methods_config[ $entity_key ]['enabled'] );
+				$is_wide_logo  = $entity_key === 'CCARD';
 
-				// Resolve logo from the live method catalog (has real SmallImageUrl).
-				$catalog_entry = $keyed_catalog[ $entity_key ] ?? [];
-				$logo_url      = $catalog_entry['small_image_url'] ?? '';
-				if ( $logo_url === '' ) {
-					$logo_url = 'https://gateway.ifthenpay.com/plugins/logotipos/small/' . strtolower( $entity_key ) . '.png';
-				}
-
-				// IsVisible from the live method catalog — reflects the latest API data.
-				$is_visible   = $catalog_entry !== [] ? (bool) ( $catalog_entry['is_visible'] ?? true ) : true;
-				$is_wide_logo = $entity_key === 'CCARD';
-
-				// Initialise both sets so the template is always defined.
-				$entity_accounts = [];
-				$has_accounts    = false;
-				$account         = '';
-				$has_account     = false;
-
-				if ( $is_dynamic ) {
-					$entity_accounts = (array) ( $dynamic_accounts[ $entity_key ] ?? [] );
-					$has_accounts    = ! empty( $entity_accounts );
-				} else {
-					$account     = (string) ( $method['account'] ?? '' );
-					$has_account = $account !== '';
-				}
-
-				// A method is "ready" only when it has an account (static) or has
-				// at least one selectable account (dynamic). Unready methods get the
-				// Activate UX path instead of an enable-toggle.
-				$is_ready     = $is_dynamic ? $has_accounts : $has_account;
 				$item_classes = 'iftp-gf-method-item';
-				if ( $is_enabled )    { $item_classes .= ' is-enabled'; }
-				if ( ! $is_visible )  { $item_classes .= ' is-unavailable'; }
-				if ( ! $is_ready )    { $item_classes .= ' is-unactivated'; }
-				?>
+				if ( $is_enabled )         { $item_classes .= ' is-enabled'; }
+				if ( ! $is_provisioned )   { $item_classes .= ' is-unactivated'; }
+			?>
 				<div class="<?php echo esc_attr( $item_classes ); ?>" data-entity="<?php echo esc_attr( $entity_key ); ?>">
-
 					<label class="iftp-gf-method-item-label">
 						<input
 							type="checkbox"
 							name="_gform_setting_methods_config[<?php echo esc_attr( $entity_key ); ?>][enabled]"
 							value="1"
-							<?php checked( $is_enabled && $is_ready ); ?>
-							<?php disabled( ! $is_visible || ! $is_ready ); ?>
+							<?php checked( $is_enabled ); ?>
+							<?php disabled( ! $is_provisioned ); ?>
 							class="iftp-gf-method-toggle"
 							data-entity="<?php echo esc_attr( $entity_key ); ?>"
 						/>
-						<?php if ( ! $is_dynamic ) : ?>
 						<input
 							type="hidden"
 							name="_gform_setting_methods_config[<?php echo esc_attr( $entity_key ); ?>][account]"
-							value="<?php echo esc_attr( $account ?? '' ); ?>"
+							value="<?php echo esc_attr( $account ); ?>"
 						/>
-						<?php endif; ?>
 						<span class="iftp-gf-method-icon-wrap<?php echo $is_wide_logo ? ' is-wide' : ''; ?>">
 							<img src="<?php echo esc_url( $logo_url ); ?>" alt="<?php echo esc_attr( $method_label ); ?>" loading="lazy" />
 						</span>
 						<span class="iftp-gf-method-name"><?php echo esc_html( $method_label ); ?></span>
-						<?php if ( ! $is_visible ) : ?>
-							<span class="iftp-gf-unavailable-badge"><?php esc_html_e( 'Unavailable', 'ifthenpay-payments-for-gravityforms' ); ?></span>
-						<?php endif; ?>
 					</label>
 
 					<div class="iftp-gf-method-right">
-						<?php if ( $is_dynamic ) : ?>
-
-							<?php if ( $has_accounts ) : ?>
-								<select
-									name="_gform_setting_methods_config[<?php echo esc_attr( $entity_key ); ?>][account]"
-									class="iftp-gf-method-account-select"
-								>
-									<?php foreach ( $entity_accounts as $acct ) : ?>
-										<option
-											value="<?php echo esc_attr( $acct['account'] ); ?>"
-											<?php selected( $saved_account, $acct['account'] ); ?>
-										><?php echo esc_html( $acct['label'] ); ?></option>
-									<?php endforeach; ?>
-								</select>
-							<?php else : ?>
-								<em class="iftp-gf-no-account"><?php esc_html_e( 'Not activated', 'ifthenpay-payments-for-gravityforms' ); ?></em>
-								<button
-									type="button"
-									class="button button-small iftp-gf-activate-method"
-									data-entity="<?php echo esc_attr( $entity_key ); ?>"
-									data-gateway-key="<?php echo esc_attr( $gateway_key ); ?>"
-								>
-									<?php esc_html_e( 'Request Activation', 'ifthenpay-payments-for-gravityforms' ); ?>
-								</button>
-							<?php endif; ?>
-
+						<?php if ( $is_provisioned ) : ?>
+							<code class="iftp-gf-account-code"><?php echo esc_html( $account ); ?></code>
+							<span class="iftp-gf-active-badge" title="<?php esc_attr_e( 'Provisioned', 'ifthenpay-payments-for-gravityforms' ); ?>">&#10003;</span>
 						<?php else : ?>
-
-							<?php if ( $has_account ) : ?>
-								<code class="iftp-gf-account-code"><?php echo esc_html( $account ); ?></code>
-								<span class="iftp-gf-active-badge" title="<?php esc_attr_e( 'Activated', 'ifthenpay-payments-for-gravityforms' ); ?>">&#10003;</span>
-							<?php else : ?>
-								<em class="iftp-gf-no-account"><?php esc_html_e( 'Not activated', 'ifthenpay-payments-for-gravityforms' ); ?></em>
-								<button
-									type="button"
-									class="button button-small iftp-gf-activate-method"
-									data-entity="<?php echo esc_attr( $entity_key ); ?>"
-									data-gateway-key="<?php echo esc_attr( $gateway_key ); ?>"
-								>
-									<?php esc_html_e( 'Request Activation', 'ifthenpay-payments-for-gravityforms' ); ?>
-								</button>
-							<?php endif; ?>
-
+							<em class="iftp-gf-no-account"><?php esc_html_e( 'Not activated', 'ifthenpay-payments-for-gravityforms' ); ?></em>
+							<button
+								type="button"
+								class="button button-small iftp-gf-activate-method"
+								data-entity="<?php echo esc_attr( $entity_key ); ?>"
+								data-gateway-key="<?php echo esc_attr( $gateway_key ); ?>"
+							>
+								<?php esc_html_e( 'Request Activation', 'ifthenpay-payments-for-gravityforms' ); ?>
+							</button>
 						<?php endif; ?>
 					</div>
-
 				</div>
 			<?php endforeach; ?>
 		</div>
@@ -602,12 +565,15 @@ class Addon extends \GFPaymentAddOn {
 	 * Custom settings field renderer for the global gateways overview table (plugin settings page).
 	 */
 	public function settings_iftp_gf_payment_methods_table( mixed $_field, bool $echo = true ): string {
-		$catalog = self::get_gateway_catalog();
+		// Fresh fetches — same calls used by the Feed Settings page. The
+		// per-request memoisation inside fetch_*() prevents duplicate hits.
+		$gateways          = $this->fetch_gravityforms_gateways();
+		$visible_methods   = $this->fetch_visible_methods_keyed();
 
 		ob_start();
 
-		if ( empty( $catalog ) ) {
-			echo '<p class="iftp-gf-no-methods">' . esc_html__( 'No gateways loaded. Connect your Backoffice Key above to load your gateways and payment methods.', 'ifthenpay-payments-for-gravityforms' ) . '</p>';
+		if ( empty( $gateways ) ) {
+			echo '<p class="iftp-gf-no-methods">' . esc_html__( 'No GravityForms-type gateways found for this backoffice key. Contact ifthenpay support if you expect one.', 'ifthenpay-payments-for-gravityforms' ) . '</p>';
 		} else {
 			?>
 			<h4 style="margin:16px 0 8px;"><?php esc_html_e( 'Loaded Gateways', 'ifthenpay-payments-for-gravityforms' ); ?></h4>
@@ -620,17 +586,28 @@ class Addon extends \GFPaymentAddOn {
 					</tr>
 				</thead>
 				<tbody>
-					<?php foreach ( $catalog as $key => $gateway ) : ?>
+					<?php foreach ( $gateways as $row ) :
+						$key   = (string) ( $row['GatewayKey'] ?? '' );
+						$alias = (string) ( $row['Alias'] ?? '' );
+						if ( $key === '' ) {
+							continue;
+						}
+						$provisioned = [];
+						foreach ( $visible_methods as $entity => $cat_entry ) {
+							if ( $this->resolve_account_in_row( $row, $entity, (string) ( $cat_entry['label'] ?? '' ) ) !== '' ) {
+								$provisioned[] = $entity;
+							}
+						}
+					?>
 						<tr>
 							<td><code><?php echo esc_html( $key ); ?></code></td>
-							<td><?php echo esc_html( sanitize_text_field( (string) ( $gateway['alias'] ?? '' ) ) ); ?></td>
+							<td><?php echo esc_html( $alias ); ?></td>
 							<td>
 								<?php
-								$methods = array_keys( (array) ( $gateway['methods'] ?? [] ) );
-								if ( ! empty( $methods ) ) {
-									echo esc_html( implode( ', ', array_map( 'strtoupper', $methods ) ) );
+								if ( ! empty( $provisioned ) ) {
+									echo esc_html( implode( ', ', $provisioned ) );
 								} else {
-									echo '<em>' . esc_html__( 'None or Dynamic Gateway', 'ifthenpay-payments-for-gravityforms' ) . '</em>';
+									echo '<em>' . esc_html__( 'No provisioned methods on this gateway.', 'ifthenpay-payments-for-gravityforms' ) . '</em>';
 								}
 								?>
 							</td>
@@ -641,11 +618,10 @@ class Addon extends \GFPaymentAddOn {
 			<?php
 		}
 
-		$html = ob_get_clean();
+		$html = (string) ob_get_clean();
 
 		if ( $echo ) {
-			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Sanitized via static kses_admin_html().
-			echo $this->kses_admin_html( $html );
+			echo self::kses_admin_html( $html );
 		}
 
 		return $html;
@@ -725,145 +701,148 @@ class Addon extends \GFPaymentAddOn {
 	public function save_feed_settings( $feed_id, $form_id, $settings ) {
 		// GFPaymentAddOn reads $feed['meta']['transactionType'] in validation() and
 		// entry_post_save(); we don't expose subscriptions, so force 'product'
-		// (= one-time payment) on every save. Eliminates the "Undefined array key"
-		// PHP warning and ensures GF takes the redirect_url branch.
+		// (= one-time payment) on every save.
 		if ( empty( $settings['transactionType'] ) ) {
 			$settings['transactionType'] = 'product';
 		}
 
 		$result = parent::save_feed_settings( $feed_id, $form_id, $settings );
 		if ( $result ) {
+			$saved_feed_id = (int) $result;
+			// If another ifthenpay feed is already active on this form, force the
+			// just-saved feed to inactive. We never auto-deactivate the other one —
+			// the admin has to make that decision explicitly.
+			if ( $this->has_other_active_feed( (int) $form_id, $saved_feed_id ) ) {
+				$this->update_feed_active( $saved_feed_id, 0 );
+				\GFCommon::add_error_message(
+					__( 'Another ifthenpay feed is already active on this form. Deactivate it first before activating this one.', 'ifthenpay-payments-for-gravityforms' )
+				);
+			}
 			$this->sync_form_payment_info( (int) $form_id, $settings );
 		}
 		return $result;
 	}
 
 	/**
-	 * Resolves and persists enabled-methods data for a specific form.
-	 * Stored as a plain WP option (no transient expiry) so data survives
-	 * indefinitely until the admin saves the feed again or disconnects.
+	 * Intercepts the activate/deactivate toggle in the feeds list. Blocks
+	 * activation when another ifthenpay feed on the same form is already
+	 * active and surfaces an admin error message; deactivation is always
+	 * allowed.
 	 *
-	 * Option key: ifthenpay_gf_form_{$form_id}
+	 * @param int|string $feed_id
+	 * @param int|bool   $is_active
+	 * @return bool
+	 */
+	public function update_feed_active( $feed_id, $is_active ) {
+		$feed_id_int = (int) $feed_id;
+		$activating  = ! empty( $is_active );
+
+		if ( $activating && $feed_id_int > 0 ) {
+			$feed = $this->get_feed( $feed_id_int );
+			if ( $feed ) {
+				$form_id = (int) ( $feed['form_id'] ?? 0 );
+				if ( $form_id > 0 && $this->has_other_active_feed( $form_id, $feed_id_int ) ) {
+					\GFCommon::add_error_message(
+						__( 'Another ifthenpay feed is already active on this form. Deactivate it first before activating this one.', 'ifthenpay-payments-for-gravityforms' )
+					);
+					return false;
+				}
+			}
+		}
+
+		return parent::update_feed_active( $feed_id, $is_active );
+	}
+
+	/**
+	 * @return bool true when any *other* ifthenpay feed on `$form_id` is currently active.
+	 */
+	private function has_other_active_feed( int $form_id, int $exclude_feed_id ): bool {
+		$feeds = \GFAPI::get_feeds( null, $form_id, $this->get_slug() );
+		if ( ! is_array( $feeds ) ) {
+			return false;
+		}
+		foreach ( $feeds as $feed ) {
+			$fid = (int) ( $feed['id'] ?? 0 );
+			if ( $fid > 0 && $fid !== $exclude_feed_id && ! empty( $feed['is_active'] ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Builds and persists the per-form payment snapshot.
+	 *
+	 * Schema (the single source of truth read by both the frontend field and
+	 * `redirect_url()` — no global catalog reads anywhere downstream):
+	 *
+	 *   {
+	 *     "gateway_key":        "XXX-123456",
+	 *     "default_method": "MBWAY",
+	 *     "pay_description":    "Order from My Store",
+	 *     "pay_methods": [
+	 *       { "entity": "MBWAY",   "account": "MBWAY-1234",   "is_active": true,  "img_url": "…" },
+	 *       { "entity": "PAYSHOP", "account": "PAYSHOP-1234", "is_active": false, "img_url": "…" }
+	 *     ]
+	 *   }
+	 *
+	 * Option key: `ifthenpay_gf_form_{$form_id}`.
 	 */
 	public function sync_form_payment_info( int $form_id, array $settings ): void {
 		$gateway_key = (string) ( $settings['gateway_key'] ?? '' );
-
 		if ( $gateway_key === '' ) {
 			delete_option( self::OPTION_FORM_INFO_PREFIX . $form_id );
 			return;
 		}
 
-		$catalog       = self::get_gateway_catalog();
-		$keyed_catalog = self::get_keyed_method_catalog();
-		$is_dynamic    = self::is_dynamic_gateway( $gateway_key );
-
-		$methods_config_raw = $settings['methods_config'] ?? [];
-		$methods_config     = is_string( $methods_config_raw )
+		// Pull the freshly-built rows for the gateway (visible methods × gateway accounts)
+		// and combine with the admin's checkbox state to emit the pay_methods array.
+		$method_rows         = $this->build_method_rows_for_gateway( $gateway_key );
+		$methods_config_raw  = $settings['methods_config'] ?? [];
+		$methods_config      = is_string( $methods_config_raw )
 			? (array) json_decode( $methods_config_raw, true )
 			: (array) $methods_config_raw;
 
-		$enabled = [];
-
-		if ( $is_dynamic ) {
-			foreach ( $methods_config as $entity => $cfg ) {
-				$entity_key = strtoupper( (string) $entity );
-				if ( empty( $cfg['enabled'] ) || empty( $cfg['account'] ) ) {
-					continue;
-				}
-				$cat_entry          = $keyed_catalog[ $entity_key ] ?? [];
-				$enabled[ $entity_key ] = [
-					'label'     => (string) ( $cat_entry['label'] ?? $entity_key ),
-					'account'   => (string) $cfg['account'],
-					'image_url' => (string) ( $cat_entry['small_image_url'] ?? '' ),
-				];
+		$pay_methods = [];
+		foreach ( $method_rows as $row ) {
+			// Skip methods that aren't provisioned on this gateway — they only
+			// exist in the feed-settings UI to surface an Activate button and
+			// shouldn't end up in the per-form snapshot (nothing to pay with).
+			if ( (string) ( $row['account'] ?? '' ) === '' ) {
+				continue;
 			}
-		} else {
-			// Iterate methods_config directly — for static gateways the admin's
-			// methods_config already stores the account in a hidden input on save,
-			// so we don't need the global catalog to be populated to resolve this.
-			$catalog_methods = (array) ( $catalog[ $gateway_key ]['methods'] ?? [] );
-			foreach ( $methods_config as $entity => $cfg ) {
-				if ( ! is_array( $cfg ) || empty( $cfg['enabled'] ) ) {
-					continue;
-				}
-				$entity_key = strtoupper( (string) $entity );
-
-				// Account priority: methods_config (admin's hidden input) → catalog → empty.
-				$account = (string) ( $cfg['account'] ?? '' );
-				if ( $account === '' ) {
-					$account = (string) ( $catalog_methods[ $entity ]['account']
-						?? $catalog_methods[ $entity_key ]['account']
-						?? $catalog_methods[ strtolower( $entity ) ]['account']
-						?? '' );
-				}
-				if ( $account === '' ) {
-					continue;
-				}
-
-				$cat_entry           = $keyed_catalog[ $entity_key ] ?? [];
-				$catalog_method      = $catalog_methods[ $entity ]
-					?? $catalog_methods[ $entity_key ]
-					?? $catalog_methods[ strtolower( $entity ) ]
-					?? [];
-				$label = (string) ( $catalog_method['method'] ?? $cat_entry['label'] ?? $entity_key );
-
-				$enabled[ $entity_key ] = [
-					'label'     => $label,
-					'account'   => $account,
-					'image_url' => (string) ( $cat_entry['small_image_url'] ?? '' ),
-				];
-			}
+			$position	   = $row['position'];
+			$entity        = $row['entity'];
+			$is_active     = ! empty( $methods_config[ $entity ]['enabled'] );
+			$pay_methods[] = [
+				'entity'    => $entity,
+				'account'   => $row['account'],
+				'is_active' => $is_active,
+				'position'	=> $position,
+				'img_url'   => $row['image_url'],
+			];
 		}
 
 		update_option(
 			self::OPTION_FORM_INFO_PREFIX . $form_id,
 			[
-				'gateway_key'           => $gateway_key,
-				'is_dynamic'            => $is_dynamic,
-				'enabled_methods'       => $enabled,
-				'default_method'        => strtoupper( (string) ( $settings['default_method'] ?? '' ) ),
-				'description'           => sanitize_text_field( (string) ( $settings['description'] ?? '' ) ),
-				'payment_amount_source' => sanitize_text_field( (string) ( $settings['payment_amount_source'] ?? 'form_total' ) ),
-				'payment_amount_field'  => sanitize_text_field( (string) ( $settings['payment_amount_field'] ?? '' ) ),
-				'payment_amount_fixed'  => sanitize_text_field( (string) ( $settings['payment_amount_fixed'] ?? '' ) ),
+				'gateway_key'        => $gateway_key,
+				'default_method' => strtoupper( (string) ( $settings['default_method'] ?? '' ) ),
+				'pay_description'    => sanitize_text_field( (string) ( $settings['description'] ?? '' ) ),
+				'pay_methods'        => $pay_methods,
 			],
 			false
 		);
 	}
 
 	/**
-	 * Returns the stored per-form payment info, or an empty array if not set.
-	 *
-	 * Lazy-migrates: if the option doesn't exist but an active feed does,
-	 * we run sync_form_payment_info() from the feed meta and return the result.
-	 * That way feeds saved before this refactor "just work" on first access.
+	 * Returns the stored per-form snapshot, or an empty array if none exists.
+	 * No lazy migration: the snapshot is written every time `save_feed_settings`
+	 * runs, so if it's missing it means the admin has never saved the feed.
 	 */
 	public static function get_form_payment_info( int $form_id ): array {
 		$data = get_option( self::OPTION_FORM_INFO_PREFIX . $form_id, [] );
-		if ( is_array( $data ) && ! empty( $data ) ) {
-			return $data;
-		}
-
-		// Lazy migration from existing feed meta.
-		$feeds = \GFAPI::get_feeds( null, $form_id, 'iftp_gf' );
-		if ( ! is_array( $feeds ) ) {
-			return [];
-		}
-
-		foreach ( $feeds as $feed ) {
-			if ( empty( $feed['is_active'] ) ) {
-				continue;
-			}
-			$meta = is_array( $feed['meta'] ?? null ) ? $feed['meta'] : [];
-			if ( empty( $meta['gateway_key'] ?? '' ) ) {
-				continue;
-			}
-			self::get_instance()->sync_form_payment_info( $form_id, $meta );
-			$data = get_option( self::OPTION_FORM_INFO_PREFIX . $form_id, [] );
-			return is_array( $data ) ? $data : [];
-		}
-
-		return [];
+		return is_array( $data ) ? $data : [];
 	}
 
 	// -------------------------------------------------------------------------
@@ -873,32 +852,9 @@ class Addon extends \GFPaymentAddOn {
 	public function get_submission_data( $feed, $form, $entry ): array {
 		$data = parent::get_submission_data( $feed, $form, $entry );
 
-		$source = (string) rgars( $feed, 'meta/payment_amount_source' );
-
-		// Feed setting takes priority over auto-detected form total when set explicitly.
-		if ( $source === 'fixed' ) {
-			$fixed = (float) str_replace( ',', '.', (string) rgars( $feed, 'meta/payment_amount_fixed' ) );
-			if ( $fixed > 0 ) {
-				$data['payment_amount'] = $fixed;
-			}
-		} elseif ( $source === 'field' ) {
-			$field_id = (string) rgars( $feed, 'meta/payment_amount_field' );
-			if ( $field_id !== '' ) {
-				$raw    = (string) rgar( $entry, $field_id );
-				// Strip currency symbols, thousands separators, normalize decimal comma to dot.
-				$clean  = preg_replace( '/[^\d,.\-]/', '', $raw );
-				if ( preg_match( '/\d{1,3}(\.\d{3})*(,\d+)?$/', (string) $clean ) ) {
-					$clean = str_replace( '.', '', (string) $clean );
-					$clean = str_replace( ',', '.', (string) $clean );
-				}
-				$amount = (float) $clean;
-				if ( $amount > 0 ) {
-					$data['payment_amount'] = $amount;
-				}
-			}
-		}
-
-		// Final fallback: GF pricing fields (form total).
+		// Form-total auto-detection only — sum of pricing fields (product, total,
+		// quantity, shipping). Forms without any pricing field will resolve to 0
+		// and our validation filter will block the submission with a clear error.
 		if ( empty( $data['payment_amount'] ) || (float) $data['payment_amount'] <= 0 ) {
 			$amount = GFFormData::resolve_amount( $form, $entry );
 			if ( $amount > 0 ) {
@@ -945,30 +901,43 @@ class Addon extends \GFPaymentAddOn {
 			return '';
 		}
 
-		$enabled_methods = (array) ( $form_info['enabled_methods'] ?? [] );
-		if ( empty( $enabled_methods ) ) {
-			$this->log_error( __METHOD__ . '(): No enabled methods for form #' . $form_id );
+		// New schema: pay_methods is a flat list; the customer only pays with the ones
+		// the admin actively flagged via is_active=true on the feed-settings table.
+		$pay_methods = (array) ( $form_info['pay_methods'] ?? [] );
+		if ( empty( $pay_methods ) ) {
+			$this->log_error( __METHOD__ . '(): No pay_methods in form info for form #' . $form_id );
 			return '';
 		}
 
-		// Build accounts string from the per-form snapshot.
-		$account_parts = [];
-		foreach ( $enabled_methods as $method ) {
-			$acct = trim( (string) ( $method['account'] ?? '' ) );
-			if ( $acct !== '' ) {
-				$account_parts[] = preg_replace( '/\s*\|\s*/', '|', $acct );
+		$account_parts        = [];
+		$active_method_config = [];
+		$selected_position    = 0;
+		$default_method = strtoupper( (string) ( $form_info['default_method'] ?? '' ) );
+
+		foreach ( $pay_methods as $method ) {
+			if ( empty( $method['is_active'] ) ) {
+				continue;
 			}
+			$entity = strtoupper( (string) ( $method['entity'] ?? '' ) );
+			$acct   = trim( (string) ( $method['account'] ?? '' ) );
+			$position = abs((int) ($method['position'] ?? 0));
+
+			if ( $entity === '' || $acct === '' || $position === 0) {
+				continue;
+			}
+			$account_parts[]              = preg_replace( '/\s*\|\s*/', '|', $acct );
+
+			if ( $entity === $default_method ) {
+				$selected_position = $position;
+			}
+
+			$active_method_config[ $entity ] = [ 'enabled' => '1', 'account' => $acct, 'position' => $position];
 		}
 		$accounts = implode( ';', $account_parts );
 
 		if ( $accounts === '' ) {
-			$this->log_error( __METHOD__ . '(): Empty accounts string for form #' . $form_id );
+			$this->log_error( __METHOD__ . '(): No methods flagged is_active for form #' . $form_id );
 			return '';
-		}
-
-		$methods_config = [];
-		foreach ( $enabled_methods as $entity => $method ) {
-			$methods_config[ $entity ] = [ 'enabled' => '1', 'account' => $method['account'] ?? '' ];
 		}
 
 		$source_url = (string) rgar( $entry, 'source_url' );
@@ -979,8 +948,7 @@ class Addon extends \GFPaymentAddOn {
 		$customer_email = GFFormData::get_customer_email( $form, $entry );
 		$customer_name  = GFFormData::get_customer_name( $form, $entry );
 
-		$description    = sanitize_text_field( (string) ( $form_info['description'] ?? '' ) );
-		$default_method = strtoupper( (string) ( $form_info['default_method'] ?? '' ) );
+		$description    = sanitize_text_field( (string) ( $form_info['pay_description'] ?? '' ) );
 
 		$payload = IfthenpayPayload::build_pay_by_link_payload( [
 			'id'              => (string) $entry_id,
@@ -990,21 +958,22 @@ class Addon extends \GFPaymentAddOn {
 			'success_url'     => $urls['success_url'],
 			'error_url'       => $urls['error_url'],
 			'cancel_url'      => $urls['cancel_url'],
-			'selected_method' => IfthenpayPayload::get_selected_method_code(
-				[ 'default_method' => $default_method ],
-				$methods_config
-			),
+			// API expects the Position number as a string (e.g. "4" for CCARD)
+			// — the ifthenpay sample payload puts it in quotes. Omit when zero
+			// so the gateway falls back to "first enabled".
+			'selected_method' => $selected_position > 0 ? (string) $selected_position : '',
 			'email'           => $customer_email,
 			'name'            => $customer_name,
 		] );
 
 		$this->log_debug( sprintf(
-			'%s(): Entry #%d → calling create_payment_link gateway=%s amount=%.2f accounts=%s',
+			'%s(): Entry #%d → calling create_payment_link gateway=%s amount=%.2f accounts=%s selected=%d',
 			__METHOD__,
 			$entry_id,
 			$gateway_key,
 			$amount,
-			$accounts
+			$accounts,
+			$selected_position
 		) );
 
 		try {
@@ -1140,11 +1109,11 @@ class Addon extends \GFPaymentAddOn {
 		$amount          = (float) ( $submission_data['payment_amount'] ?? 0 );
 
 		if ( $amount <= 0 ) {
-			$this->log_error( __METHOD__ . sprintf( '(): Form #%d submission blocked — resolved payment amount is %.2f. Check the feed\'s Payment Amount Source setting.', $form_id, $amount ) );
+			$this->log_error( __METHOD__ . sprintf( '(): Form #%d submission blocked — resolved payment amount is %.2f. Add a pricing field to the form.', $form_id, $amount ) );
 			return $this->fail_validation_on_field(
 				$validation_result,
 				$form,
-				__( 'Payment amount could not be determined. The site administrator needs to configure a Payment Amount Source on the ifthenpay feed (a pricing field, a specific form field, or a fixed amount).', 'ifthenpay-payments-for-gravityforms' )
+				__( 'Payment amount could not be determined. The form needs at least one pricing field (Product, Total, Shipping, or Quantity) for the amount to be calculated.', 'ifthenpay-payments-for-gravityforms' )
 			);
 		}
 
@@ -1205,9 +1174,9 @@ class Addon extends \GFPaymentAddOn {
 		if ( ! wp_style_is( 'ifthenpay-gf-frontend', 'enqueued' ) ) {
 			wp_enqueue_style(
 				'ifthenpay-gf-frontend',
-				IFTP_GF_URL . 'assets/css/frontend.css',
+				\IFTP_GF_URL . 'assets/css/frontend.css',
 				[],
-				IFTP_GF_VERSION
+				\IFTP_GF_VERSION
 			);
 		}
 
@@ -1269,7 +1238,10 @@ class Addon extends \GFPaymentAddOn {
 			return;
 		}
 
-		if ( ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) !== 'GET' ) {
+		$request_method = isset( $_SERVER['REQUEST_METHOD'] )
+			? strtoupper( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) )
+			: 'GET';
+		if ( $request_method !== 'GET' ) {
 			status_header( 405 );
 			exit( 'Method Not Allowed' );
 		}
@@ -1346,8 +1318,8 @@ class Addon extends \GFPaymentAddOn {
 			exit( 'amount mismatch' );
 		}
 
-		// Validate method against the live keyed catalog.
-		$catalog = self::get_keyed_method_catalog();
+		// Validate method against the live available-methods list (fresh).
+		$catalog = $this->fetch_visible_methods_keyed();
 		if ( ! isset( $catalog[ strtoupper( $mtd ) ] ) && ! is_numeric( $mtd ) ) {
 			status_header( 403 );
 			exit( 'method invalid' );
@@ -1426,6 +1398,7 @@ class Addon extends \GFPaymentAddOn {
 				try {
 					$verified = IfthenpayClient::verify_transaction_paid( $tx );
 				} catch ( \RuntimeException $e ) {
+					error_log( sprintf( '[ifthenpay-gf] verify_transaction_paid() error for entry #%d tx=%s: %s', $entry_id, $tx, $e->getMessage() ) );
 					$verified = null;
 				}
 			}
@@ -1453,7 +1426,7 @@ class Addon extends \GFPaymentAddOn {
 					$entry_id,
 					sprintf(
 						/* translators: %s: transaction id */
-						esc_html__( 'Customer returned from the ifthenpay gateway but payment is not yet received (transaction %s). Awaiting webhook callback.', 'ifthenpay-payments-for-gravityforms' ),
+						esc_html__( 'Customer returned from the ifthenpay gateway but payment is not yet received or failed (transaction %s). Awaiting webhook callback.', 'ifthenpay-payments-for-gravityforms' ),
 						$tx !== '' ? $tx : '—'
 					),
 					''
@@ -1525,9 +1498,12 @@ class Addon extends \GFPaymentAddOn {
 			wp_send_json_error( [ 'message' => __( 'Invalid Backoffice Key format.', 'ifthenpay-payments-for-gravityforms' ) ], 400 );
 		}
 
-		// Only verify the key is valid — catalog data is fetched lazily when feed settings open.
+		// Single API call — confirms the key resolves to at least one GravityForms-type
+		// gateway. Catalog data is NOT cached; the Feed Settings page re-fetches on every
+		// render. Saving the WordPress settings later won't re-trigger this — it only runs
+		// when the customer explicitly clicks Connect.
 		try {
-			$gateway_rows = ( new IfthenpayClient( $backoffice_key ) )->get_gateway_keys( '' );
+			$gateway_rows = ( new IfthenpayClient( $backoffice_key ) )->get_gateway_keys( self::GATEWAY_TYPE );
 		} catch ( \Throwable ) {
 			$gateway_rows = [];
 		}
@@ -1542,12 +1518,6 @@ class Addon extends \GFPaymentAddOn {
 				),
 			], 400 );
 		}
-
-		// Clear any previously cached catalog so the next feed-settings load fetches fresh data.
-		delete_option( self::OPTION_GATEWAY_CATALOG );
-		delete_option( self::OPTION_METHOD_CATALOG );
-		delete_transient( self::TRANSIENT_CATALOG_FRESH );
-		IfthenpayClient::bust_available_methods_cache();
 
 		update_option( self::OPTION_BACKOFFICE_KEY, $backoffice_key, false );
 
@@ -1566,12 +1536,8 @@ class Addon extends \GFPaymentAddOn {
 		}
 
 		delete_option( self::OPTION_BACKOFFICE_KEY );
-		delete_option( self::OPTION_GATEWAY_CATALOG );
-		delete_option( self::OPTION_METHOD_CATALOG );
-		delete_transient( self::TRANSIENT_CATALOG_FRESH );
-		IfthenpayClient::bust_available_methods_cache();
 
-		// Remove all per-form payment info options.
+		// Remove all per-form payment snapshots in one sweep.
 		global $wpdb;
 		$wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$wpdb->prepare(
@@ -1587,47 +1553,12 @@ class Addon extends \GFPaymentAddOn {
 	}
 
 	// -------------------------------------------------------------------------
-	// AJAX: load gateway methods for feed settings
-	// -------------------------------------------------------------------------
-
-	public function ajax_load_gateway_methods(): void {
-		check_ajax_referer( 'iftp_gf_admin', 'nonce' );
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( [], 403 );
-		}
-
-		$gateway_key = isset( $_POST['gateway_key'] )
-			? sanitize_text_field( wp_unslash( (string) $_POST['gateway_key'] ) )
-			: '';
-
-		$catalog = self::get_gateway_catalog();
-
-		[ $available_methods, $is_dynamic, $dynamic_accounts ] =
-			$this->resolve_available_methods( $gateway_key, $catalog );
-
-		ob_start();
-		if ( empty( $available_methods ) ) {
-			if ( $is_dynamic ) {
-				echo '<p class="iftp-gf-no-methods">' . esc_html__( 'No accounts found for this gateway. Please contact ifthenpay support.', 'ifthenpay-payments-for-gravityforms' ) . '</p>';
-			} else {
-				echo '<p class="iftp-gf-no-methods">' . esc_html__( 'No payment methods found for this gateway key.', 'ifthenpay-payments-for-gravityforms' ) . '</p>';
-			}
-		} else {
-			$this->render_methods_list( $available_methods, [], $gateway_key, $is_dynamic, $dynamic_accounts );
-		}
-		$html = ob_get_clean();
-
-		wp_send_json_success( [
-			'html'                  => $html,
-			'default_method_options' => $this->build_default_method_options_html(
-				$gateway_key, $is_dynamic, $dynamic_accounts, $available_methods
-			),
-		] );
-	}
-
-	// -------------------------------------------------------------------------
 	// AJAX: request method activation email
+	//
+	// Fires when the admin clicks "Request Activation" next to a method that
+	// is visible in the catalog but not provisioned on the selected gateway.
+	// Sends a templated email via IfthenpayEmailHelper to ifthenpay support
+	// with the gateway/method context. 24h cooldown per (gateway, entity).
 	// -------------------------------------------------------------------------
 
 	public function ajax_activate_payment_method(): void {
@@ -1660,7 +1591,7 @@ class Addon extends \GFPaymentAddOn {
 			'site_name'      => get_bloginfo( 'name' ),
 			'wp_version'     => get_bloginfo( 'version' ),
 			'gf_version'     => \GFCommon::$version ?? '',
-			'plugin_version' => IFTP_GF_VERSION,
+			'plugin_version' => \IFTP_GF_VERSION,
 		] );
 
 		set_transient( $cooldown_key, 1, DAY_IN_SECONDS );
@@ -1689,7 +1620,7 @@ class Addon extends \GFPaymentAddOn {
 			<?php endif; ?>
 		</div>
 		<?php
-		return ob_get_clean();
+		return (string) ob_get_clean();
 	}
 
 	// -------------------------------------------------------------------------
@@ -1700,223 +1631,188 @@ class Addon extends \GFPaymentAddOn {
 		return trim( (string) get_option( self::OPTION_BACKOFFICE_KEY, '' ) );
 	}
 
-	public static function get_gateway_catalog(): array {
-		$catalog = get_option( self::OPTION_GATEWAY_CATALOG, [] );
-		return is_array( $catalog ) ? $catalog : [];
-	}
-
-	public static function get_method_catalog(): array {
-		$catalog = get_option( self::OPTION_METHOD_CATALOG, [] );
-		return is_array( $catalog ) ? $catalog : [];
-	}
-
-	/**
-	 * Returns the method catalog keyed by uppercase entity code.
-	 * Each entry now carries full data: label, small_image_url, is_visible, etc.
-	 */
-	public static function get_keyed_method_catalog(): array {
-		// The stored catalog is already entity-keyed in the new format.
-		$catalog = self::get_method_catalog();
-
-		// Safety: if legacy list format is stored, re-key it on the fly.
-		if ( ! empty( $catalog ) && isset( $catalog[0] ) ) {
-			$keyed = [];
-			foreach ( $catalog as $m ) {
-				if ( ! is_array( $m ) ) {
-					continue;
-				}
-				$entity = strtoupper( (string) ( $m['entity'] ?? '' ) );
-				if ( $entity !== '' ) {
-					$keyed[ $entity ] = $m;
-				}
-			}
-			return $keyed;
-		}
-
-		return $catalog;
-	}
-
-	public static function is_dynamic_gateway( string $gateway_key ): bool {
-		$catalog = self::get_gateway_catalog();
-		$tipo    = mb_strtolower( (string) ( $catalog[ $gateway_key ]['tipo'] ?? '' ) );
-		return $tipo === 'dinâmicas' || $tipo === 'dinamicas';
-	}
-
-	public static function get_methods_config(): array {
-		return [];
-	}
-
 	// -------------------------------------------------------------------------
-	// Private helpers
+	// Fresh API fetches — called inline by feed-settings render.
+	// No caching: every Feed Settings page load hits these two endpoints exactly
+	// once. Per-request memoisation prevents the same request from calling them
+	// twice when the rendering pipeline visits multiple settings fields.
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Resolves available methods, dynamic flag and dynamic accounts for a gateway key.
+	 * Calls GET /gateway/get?type=GravityForms and returns the raw row list.
 	 *
-	 * @return array{ 0: array, 1: bool, 2: array }
+	 * @return array<int, array<string, mixed>>
 	 */
-	private function resolve_available_methods( string $gateway_key, array $catalog ): array {
-		$available_methods = [];
-		$is_dynamic        = false;
-		$dynamic_accounts  = [];
-
-		if ( $gateway_key === '' ) {
-			return [ $available_methods, $is_dynamic, $dynamic_accounts ];
-		}
-
-		$is_dynamic = self::is_dynamic_gateway( $gateway_key );
-
-		$keyed_catalog = self::get_keyed_method_catalog();
-
-		if ( $is_dynamic ) {
-			$dynamic_accounts = $this->fetch_cached_dynamic_accounts( $gateway_key );
-		}
-
-		// Always emit one row per visible method from the keyed catalog so unactivated
-		// methods can render an "Activate" link (LatePoint / MemberPress / WPForms UX).
-		// For dynamic gateways the account is empty until the admin picks one from the
-		// dropdown; for static gateways it comes from the gateway-keys row (may be empty
-		// if not yet provisioned). Methods marked IsVisible=false in the API response
-		// are dropped entirely — the gateway does not support them for new payments.
-		foreach ( $keyed_catalog as $entity_key => $cat_entry ) {
-			if ( empty( $cat_entry['is_visible'] ) ) {
-				continue;
-			}
-			$entity_key = strtoupper( (string) $entity_key );
-
-			if ( $is_dynamic ) {
-				// Dynamic accounts are sourced from $dynamic_accounts at render time;
-				// the 'account' here is unused (render_methods_list looks it up by entity).
-				$available_methods[ $entity_key ] = [
-					'method'  => (string) ( $cat_entry['label'] ?? $entity_key ),
-					'account' => '',
-				];
-			} else {
-				$static_method                    = (array) ( $catalog[ $gateway_key ]['methods'][ $entity_key ]
-					?? $catalog[ $gateway_key ]['methods'][ strtolower( $entity_key ) ]
-					?? [] );
-				$available_methods[ $entity_key ] = [
-					'method'  => (string) ( $static_method['method'] ?? $cat_entry['label'] ?? $entity_key ),
-					'account' => (string) ( $static_method['account'] ?? '' ),
-				];
-			}
-		}
-
-		return [ $available_methods, $is_dynamic, $dynamic_accounts ];
-	}
-
-	/**
-	 * Builds the HTML for the default_method <select> options for a given gateway.
-	 * Only includes methods with AllowSelectedMethod=true.
-	 * The "Auto" placeholder is always first.
-	 */
-	private function build_default_method_options_html(
-		string $gateway_key,
-		bool $is_dynamic,
-		array $dynamic_accounts,
-		array $available_methods
-	): string {
-		$keyed_catalog = self::get_keyed_method_catalog();
-
-		$html  = '<option value="">' . esc_html__( '— Auto (first enabled method) —', 'ifthenpay-payments-for-gravityforms' ) . '</option>';
-
-		foreach ( $available_methods as $entity => $method ) {
-			$entity_key = strtoupper( (string) $entity );
-			$catalog_entry = $keyed_catalog[ $entity_key ] ?? [];
-
-			// Skip methods the gateway doesn't allow as a pre-selection.
-			$allow = $catalog_entry['allow_selected_method'] ?? true;
-			if ( ! $allow ) {
-				continue;
-			}
-
-			$label = (string) ( $method['method'] ?? $entity_key );
-			$html .= sprintf(
-				'<option value="%s">%s</option>',
-				esc_attr( $entity_key ),
-				esc_html( $label )
-			);
-		}
-
-		return $html;
-	}
-
-	private function get_default_method_choices(): array {
-		$catalog     = self::get_gateway_catalog();
-		$gateway_key = (string) ( $this->get_setting( 'gateway_key' ) ?? '' );
-		$choices     = [ [ 'label' => __( '— Auto (first enabled method) —', 'ifthenpay-payments-for-gravityforms' ), 'value' => '' ] ];
-
-		if ( $gateway_key === '' ) {
-			return $choices;
-		}
-
-		$keyed_catalog = self::get_keyed_method_catalog();
-		$is_dynamic    = self::is_dynamic_gateway( $gateway_key );
-
-		if ( $is_dynamic ) {
-			// For dynamic gateways build choices from the cached dynamic accounts.
-			$dynamic_accounts = $this->fetch_cached_dynamic_accounts( $gateway_key );
-			foreach ( array_keys( $dynamic_accounts ) as $entity ) {
-				$entity_key    = strtoupper( (string) $entity );
-				$catalog_entry = $keyed_catalog[ $entity_key ] ?? [];
-
-				if ( ! ( $catalog_entry['allow_selected_method'] ?? true ) ) {
-					continue;
-				}
-
-				$label     = $catalog_entry['label'] ?? $entity_key;
-				$choices[] = [ 'label' => $label, 'value' => $entity_key ];
-			}
-		} else {
-			foreach ( $catalog[ $gateway_key ]['methods'] ?? [] as $entity => $method ) {
-				$entity_key    = strtoupper( (string) $entity );
-				$catalog_entry = $keyed_catalog[ $entity_key ] ?? [];
-
-				if ( ! ( $catalog_entry['allow_selected_method'] ?? true ) ) {
-					continue;
-				}
-
-				$label     = sanitize_text_field( (string) ( $method['method'] ?? $entity_key ) );
-				$choices[] = [ 'label' => $label, 'value' => $entity_key ];
-			}
-		}
-
-		return $choices;
-	}
-
-	private function get_gateway_key_choices(): array {
-		$catalog = self::get_gateway_catalog();
-		$choices = [ [ 'label' => __( '— Select a gateway key —', 'ifthenpay-payments-for-gravityforms' ), 'value' => '' ] ];
-
-		foreach ( $catalog as $key => $gateway ) {
-			// Alias-only label (drops the technical key); value stays the gateway key.
-			$label     = sanitize_text_field( (string) ( $gateway['label'] ?? $gateway['alias'] ?? $key ) );
-			$choices[] = [ 'label' => $label, 'value' => $key ];
-		}
-
-		return $choices;
-	}
-
-	private function fetch_cached_dynamic_accounts( string $gateway_key ): array {
-		$cache_key = 'iftp_gf_dyn_' . md5( $gateway_key );
-		$cached    = get_transient( $cache_key );
-		if ( is_array( $cached ) ) {
-			return $cached;
+	private function fetch_gravityforms_gateways(): array {
+		static $rows = null;
+		if ( $rows !== null ) {
+			return $rows;
 		}
 
 		$backoffice_key = self::get_backoffice_key();
 		if ( $backoffice_key === '' ) {
-			return [];
+			$rows = [];
+			return $rows;
 		}
 
 		try {
-			$raw      = ( new IfthenpayClient( $backoffice_key ) )->get_gateway_accounts( $gateway_key );
-			$accounts = IfthenpayClient::parse_dynamic_accounts( $raw );
-			set_transient( $cache_key, $accounts, 6 * HOUR_IN_SECONDS );
-			return $accounts;
-		} catch ( \Throwable ) {
-			return [];
+			$rows = ( new IfthenpayClient( $backoffice_key ) )->get_gateway_keys( self::GATEWAY_TYPE );
+		} catch ( \Throwable $e ) {
+			$this->log_error( __METHOD__ . '(): ' . $e->getMessage() );
+			$rows = [];
 		}
+
+		return $rows;
+	}
+
+	/**
+	 * Calls GET /gateway/methods/available, drops anything with IsVisible=false,
+	 * and returns the rest keyed by uppercase Entity. Each entry retains
+	 * Method, ImageUrl, SmallImageUrl, Position, AllowSelectedMethod.
+	 *
+	 * @return array<string, array<string, mixed>>
+	 */
+	private function fetch_visible_methods_keyed(): array {
+		static $keyed = null;
+		if ( $keyed !== null ) {
+			return $keyed;
+		}
+
+		try {
+			$raw = IfthenpayClient::get_available_methods();
+		} catch ( \Throwable $e ) {
+			$this->log_error( __METHOD__ . '(): ' . $e->getMessage() );
+			$keyed = [];
+			return $keyed;
+		}
+
+		$keyed = [];
+		foreach ( $raw as $method ) {
+			if ( empty( $method['Entity'] ) || empty( $method['IsVisible'] ) ) {
+				continue;
+			}
+			$entity           = strtoupper( (string) $method['Entity'] );
+			$keyed[ $entity ] = [
+				'entity'                => $entity,
+				'label'                 => (string) ( $method['Method'] ?? $entity ),
+				'image_url'             => (string) ( $method['ImageUrl'] ?? '' ),
+				'small_image_url'       => (string) ( $method['SmallImageUrl'] ?? '' ),
+				'position'              => (int) ( $method['Position'] ?? 0 ),
+				'allow_selected_method' => (bool) ( $method['AllowSelectedMethod'] ?? true ),
+			];
+		}
+
+		uasort( $keyed, static fn( array $a, array $b ): int => $a['position'] <=> $b['position'] );
+
+		return $keyed;
+	}
+
+	/**
+	 * Finds a single gateway row in the fresh API result by GatewayKey.
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	private function find_gateway_row( string $gateway_key ): ?array {
+		if ( $gateway_key === '' ) {
+			return null;
+		}
+		foreach ( $this->fetch_gravityforms_gateways() as $row ) {
+			if ( ! empty( $row['GatewayKey'] ) && (string) $row['GatewayKey'] === $gateway_key ) {
+				return $row;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Returns the account string for a method in a gateway row by trying every
+	 * casing variant of the Entity / Method names.
+	 */
+	private function resolve_account_in_row( array $row, string $entity, string $method_label = '' ): string {
+		$candidates = array_unique( array_filter( [
+			$entity,
+			strtoupper( $entity ),
+			strtolower( $entity ),
+			$method_label,
+			strtoupper( $method_label ),
+			strtolower( $method_label ),
+		] ) );
+
+		// MB <-> Multibanco compatibility, mirrors the gateway's column naming.
+		if ( strtoupper( $entity ) === 'MB' || strtoupper( $method_label ) === 'MULTIBANCO' ) {
+			$candidates[] = 'Multibanco';
+			$candidates[] = 'MULTIBANCO';
+			$candidates[] = 'MB';
+		}
+
+		foreach ( $candidates as $key ) {
+			if ( $key === '' || ! array_key_exists( $key, $row ) ) {
+				continue;
+			}
+			$value = sanitize_text_field( (string) $row[ $key ] );
+			if ( $value !== '' ) {
+				return $value;
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Builds the Gateway-Key <select> choices from a fresh API call.
+	 * Label = alias (or key as fallback); value = the technical key.
+	 */
+	private function get_gateway_key_choices(): array {
+		$choices = [ [ 'label' => __( '— Select a gateway key —', 'ifthenpay-payments-for-gravityforms' ), 'value' => '' ] ];
+
+		foreach ( $this->fetch_gravityforms_gateways() as $row ) {
+			$key = sanitize_text_field( (string) ( $row['GatewayKey'] ?? '' ) );
+			if ( $key === '' ) {
+				continue;
+			}
+			$alias     = sanitize_text_field( (string) ( $row['Alias'] ?? '' ) );
+			$choices[] = [
+				'label' => $alias !== '' ? $alias : $key,
+				'value' => $key,
+			];
+		}
+
+		return $choices;
+	}
+
+	/**
+	 * Builds the Default-Method <select> choices for the gateway currently
+	 * selected in the form-settings POST/state. Lists every visible method
+	 * that is provisioned on the gateway row — `allow_selected_method` is
+	 * NOT filtered here, so the admin can see all methods alongside the
+	 * methods table; the client-side `syncDefaultMethodDropdown()` then
+	 * disables the options whose entity isn't currently is_active=true.
+	 */
+	private function get_default_method_choices(): array {
+		$choices = [ [ 'label' => __( '— Auto (first enabled method) —', 'ifthenpay-payments-for-gravityforms' ), 'value' => '' ] ];
+
+		$gateway_key = (string) ( $this->get_setting( 'gateway_key' ) ?? '' );
+		if ( $gateway_key === '' ) {
+			return $choices;
+		}
+
+		$row = $this->find_gateway_row( $gateway_key );
+		if ( $row === null ) {
+			return $choices;
+		}
+
+		foreach ( $this->fetch_visible_methods_keyed() as $entity => $cat_entry ) {
+			$account = $this->resolve_account_in_row( $row, $entity, (string) ( $cat_entry['label'] ?? '' ) );
+			if ( $account === '' ) {
+				continue; // not provisioned for this gateway
+			}
+			$choices[] = [
+				'label' => (string) ( $cat_entry['label'] ?? $entity ),
+				'value' => $entity,
+			];
+		}
+
+		return $choices;
 	}
 
 	private function get_active_feed_for_settings(): ?array {

@@ -62,7 +62,7 @@ class Ifthenpay_GF_Bootstrap {
 
 		GFForms::include_payment_addon_framework();
 
-		require_once IFTP_GF_DIR . 'src/Addon.php';
+		require_once __DIR__ . '/src/Addon.php';
 
 		GFAddOn::register( \Ifthenpay\GravityForms\Addon::class );
 	}
