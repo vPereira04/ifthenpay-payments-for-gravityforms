@@ -19,7 +19,7 @@ In plain terms you get:
 * Support for orders
 * Merchant backoffice (basic sales) on web + mobile
 * Automatic payment confirmations (no card numbers stored)
-
+ 
 All settings are managed within GravityForms and your ifthenpay Backoffice. The plugin is designed so store owners can handle payments without requiring advanced technical knowledge.
 
 == Key Features ==
