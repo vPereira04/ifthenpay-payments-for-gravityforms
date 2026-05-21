@@ -62,8 +62,7 @@ final class IfthenpayReturn {
 	public static function get_return_data_from_request(): array {
 		$query_args = wp_unslash( filter_input_array( INPUT_GET ) ?: [] );
 
-		// Required: iftp_gf_pay status flag + iftp_gateway sentinel
-		// (matches build_gateway_urls()).
+
 		if ( empty( $query_args ) || empty( $query_args['iftp_gf_pay'] ) || empty( $query_args['iftp_gateway'] ) ) {
 			return [];
 		}
@@ -72,7 +71,7 @@ final class IfthenpayReturn {
 			'iftp_gf_pay' => sanitize_text_field( (string) $query_args['iftp_gf_pay'] ),
 		];
 
-		// `id` is the GF entry ID (passed as $payment_id to build_gateway_urls).
+
 		$entry_id = isset( $query_args['id'] ) ? absint( $query_args['id'] ) : 0;
 		if ( $entry_id > 0 ) {
 			$return_data['entry_id'] = $entry_id;
@@ -132,9 +131,7 @@ final class IfthenpayReturn {
 			return '';
 		}
 
-		// IfthenpayClient::verify_transaction_paid() returns the body on 200 or
-		// null on 404 — same endpoint we used to call via the old, now-removed
-		// get_payment_method_by_transaction_id() helper.
+
 		try {
 			$response = IfthenpayClient::verify_transaction_paid( $transaction_id );
 		} catch ( \RuntimeException ) {

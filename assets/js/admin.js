@@ -18,9 +18,7 @@
 	const ajaxUrl = strings.ajax_url || ajaxurl;
 	const nonce = strings.nonce || '';
 
-	// -------------------------------------------------------------------------
-	// Plugin settings page — backoffice key connect / disconnect
-	// -------------------------------------------------------------------------
+
 
 	function getKeyInput() {
 		return $('#iftp-gf-backoffice-key-input');
@@ -168,12 +166,7 @@
 		}
 	});
 
-	// -------------------------------------------------------------------------
-	// Feed settings page — keep the Default Method dropdown's options enabled
-	// only while the matching entity checkbox is checked. Purely client-side;
-	// the methods table is rendered server-side on each page load using fresh
-	// API data, so no AJAX hops happen when the admin toggles checkboxes.
-	// -------------------------------------------------------------------------
+
 
 	function syncDefaultMethodDropdown() {
 		const $select = $('[name="_gform_setting_default_method"]');
@@ -181,7 +174,7 @@
 			return;
 		}
 
-		// Build a map: entity → true (checked) | false (unchecked).
+
 		const enabled = {};
 		$('#iftp-gf-methods-table-wrapper .iftp-gf-method-toggle').each(
 			function () {
@@ -193,7 +186,7 @@
 		$select.find('option').each(function () {
 			const val = $(this).val();
 			if (val === '') {
-				return; // "Auto" placeholder is always selectable.
+				return;
 			}
 			const entity = val.toUpperCase();
 			if (Object.prototype.hasOwnProperty.call(enabled, entity)) {
@@ -201,7 +194,7 @@
 			}
 		});
 
-		// If the currently-selected default just became disabled, reset to Auto.
+
 		const current = $select.val();
 		if (
 			current !== '' &&
@@ -217,11 +210,7 @@
 		syncDefaultMethodDropdown
 	);
 
-	// -------------------------------------------------------------------------
-	// Feed settings page — gateway dropdown change → rebuild methods table
-	// client-side from window.iftpGfFeedData (injected by PHP on page load).
-	// Zero API hits — the feed data is everything we need.
-	// -------------------------------------------------------------------------
+
 
 	function escapeHtml(str) {
 		return String(str == null ? '' : str)
@@ -326,12 +315,9 @@
 			escapeHtml(feedData.strings.autoMethod) +
 			'</option>';
 		feedData.methods.forEach(function (m) {
-			// List every visible method that's provisioned on this gateway —
-			// allow_default is no longer filtered here so all methods are
-			// surfaced. syncDefaultMethodDropdown() then disables the ones
-			// whose checkbox isn't active.
+
 			if (!accounts[m.entity]) {
-				return; // not provisioned on this gateway
+				return;
 			}
 			html +=
 				'<option value="' +
@@ -342,7 +328,7 @@
 		});
 		$select.html(html);
 
-		// If the previous selection still exists on the new gateway, keep it.
+
 		if (
 			currentVal &&
 			$select.find('option[value="' + currentVal + '"]').length
@@ -386,15 +372,7 @@
 		}
 	);
 
-	// -------------------------------------------------------------------------
-	// Feed settings page — Activate Method
-	//
-	// For methods that exist in the catalog (IsVisible=true) but aren't
-	// provisioned on the currently-selected gateway, the methods table renders
-	// a "Request Activation" button instead of an account code. Clicking it
-	// hits the server endpoint, which sends an activation email via
-	// IfthenpayEmailHelper. 24h cooldown is enforced server-side.
-	// -------------------------------------------------------------------------
+
 
 	$(document).on('click', '.iftp-gf-activate-method', function (e) {
 		e.preventDefault();
@@ -444,9 +422,7 @@
 			});
 	});
 
-	// -------------------------------------------------------------------------
-	// Init
-	// -------------------------------------------------------------------------
+
 
 	$(function () {
 		syncKeyFieldVisibility();

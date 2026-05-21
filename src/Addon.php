@@ -23,9 +23,7 @@ require_once \IFTP_GF_DIR . 'src/Field/GF_Field_Ifthenpay.php';
 
 class Addon extends \GFPaymentAddOn {
 
-	// -------------------------------------------------------------------------
-	// Properties
-	// -------------------------------------------------------------------------
+
 
 	protected $_version                  = \IFTP_GF_VERSION;
 	protected $_min_gravityforms_version = '2.5';
@@ -49,9 +47,7 @@ class Addon extends \GFPaymentAddOn {
 
 	private const SIGNUP_URL = 'https://ifthenpay.com';
 
-	// -------------------------------------------------------------------------
-	// Singleton
-	// -------------------------------------------------------------------------
+
 
 	public static function get_instance(): self {
 		if ( self::$_instance === null ) {
@@ -61,17 +57,13 @@ class Addon extends \GFPaymentAddOn {
 		return self::$_instance;
 	}
 
-	// -------------------------------------------------------------------------
-	// Menu icon
-	// -------------------------------------------------------------------------
+
 
 	public function get_menu_icon(): string {
 		return $this->is_gravityforms_supported( '2.5' ) ? 'gform-icon--ifthenpay' : 'dashicons-admin-generic';
 	}
 
-	// -------------------------------------------------------------------------
-	// Initialization
-	// -------------------------------------------------------------------------
+
 
 	public function init(): void {
 		parent::init();
@@ -80,11 +72,10 @@ class Addon extends \GFPaymentAddOn {
 		add_action( 'wp', [ $this, 'handle_gateway_return' ] );
 		add_action( 'wp', [ $this, 'handle_gateway_callback' ] );
 
-		// Block form submission if another payment add-on also has an active feed on the form.
+
 		add_filter( 'gform_validation', [ $this, 'enforce_single_payment_gateway' ] );
 
-		// Inject a Stripe-style payment-result banner above the form when the user
-		// returns from the gateway (handle_gateway_return appends ?iftp_gf_status=...).
+
 		add_filter( 'gform_get_form_filter', [ $this, 'inject_payment_status_banner' ], 10, 2 );
 	}
 
@@ -92,10 +83,7 @@ class Addon extends \GFPaymentAddOn {
 		parent::init_admin();
 		add_action( 'admin_notices', [ $this, 'render_admin_notices' ] );
 
-		// The block editor (Gutenberg) renders the GF form-preview block inside
-		// an iframe that doesn't inherit the addon-framework enqueue chain. Push
-		// our frontend stylesheet in via the block-editor-assets hook so the
-		// passive preview is themed correctly inside the editor canvas.
+
 		add_action( 'enqueue_block_editor_assets', [ $this, 'enqueue_block_editor_styles' ] );
 	}
 
@@ -115,22 +103,13 @@ class Addon extends \GFPaymentAddOn {
 	public function init_ajax(): void {
 		parent::init_ajax();
 
-		// Three AJAX endpoints. The Feed Settings page renders synchronously
-		// (no AJAX hops for the methods table), but Connect/Disconnect/Activate
-		// still need server round-trips:
-		//   - connect_backoffice   → validate the key, save it.
-		//   - disconnect_backoffice → drop key + per-form snapshots.
-		//   - activate_method      → email support to request activation of a
-		//     payment method that's visible in the catalog but not yet
-		//     provisioned on the selected GravityForms-type gateway.
+
 		add_action( 'wp_ajax_iftp_gf_connect_backoffice',    [ $this, 'ajax_connect_backoffice' ] );
 		add_action( 'wp_ajax_iftp_gf_disconnect_backoffice', [ $this, 'ajax_disconnect_backoffice' ] );
 		add_action( 'wp_ajax_iftp_gf_activate_method',       [ $this, 'ajax_activate_payment_method' ] );
 	}
 
-	// -------------------------------------------------------------------------
-	// Scripts & Styles
-	// -------------------------------------------------------------------------
+
 
 	public function scripts(): array {
 		$scripts = [
@@ -186,9 +165,7 @@ class Addon extends \GFPaymentAddOn {
 		return array_merge( parent::styles(), $styles );
 	}
 
-	// -------------------------------------------------------------------------
-	// Plugin settings (global — backoffice key)
-	// -------------------------------------------------------------------------
+
 
 	public function plugin_settings_fields(): array {
 		return [
@@ -264,9 +241,7 @@ class Addon extends \GFPaymentAddOn {
 		return $html;
 	}
 
-	// -------------------------------------------------------------------------
-	// Feed settings (per-form gateway + methods config)
-	// -------------------------------------------------------------------------
+
 
 	public function feed_settings_fields(): array {
 		return [
@@ -285,7 +260,7 @@ class Addon extends \GFPaymentAddOn {
 						'label'   => __( 'Gateway Key', 'ifthenpay-payments-for-gravityforms' ),
 						'type'    => 'select',
 						'name'    => 'gateway_key',
-						'tooltip' => __( 'Select the ifthenpay gateway key for this form. After changing the selection, click "Update Settings" to load the methods provisioned on that gateway.', 'ifthenpay-payments-for-gravityforms' ),
+						'tooltip' => __( 'Select the ifthenpay gateway key for this form. The payment methods table updates automatically when you change the selection — no need to save first.', 'ifthenpay-payments-for-gravityforms' ),
 						'choices' => $this->get_gateway_key_choices(),
 					],
 					[
@@ -320,16 +295,11 @@ class Addon extends \GFPaymentAddOn {
 	public function settings_iftp_gf_methods_table( mixed $_field, bool $echo = true ): string {
 		$gateway_key = (string) ( $this->get_setting( 'gateway_key' ) ?? '' );
 
-		// Pre-fetched method list (one row per IsVisible method with an account on
-		// the selected gateway row), plus the current admin's checkbox state from
-		// the saved feed meta — both used by render_methods_list().
+
 		$methods         = $this->build_method_rows_for_gateway( $gateway_key );
 		$methods_config  = $this->read_methods_config_from_active_feed();
 
-		// Inline-attach the full per-gateway method/account map so the dropdown
-		// onchange handler can rebuild the table client-side without any extra
-		// HTTP round-trips. wp_add_inline_script() injects BEFORE the admin.js
-		// handle, so window.iftpGfFeedData is defined by the time admin.js runs.
+
 		$this->inject_feed_settings_client_data();
 
 		ob_start();
@@ -457,17 +427,11 @@ class Addon extends \GFPaymentAddOn {
 			$rows[] = [
 				'entity'    => $entity,
 				'label'     => (string) ( $cat_entry['label'] ?? $entity ),
-				// Non-provisioned methods (account === '') still appear in the
-				// feed-settings table so the admin can request activation via
-				// IfthenpayEmailHelper. They are filtered out of the saved
-				// per-form snapshot (see sync_form_payment_info()).
+
 				'account'   => $this->resolve_account_in_row( $row, $entity, (string) ( $cat_entry['label'] ?? '' ) ),
-				// User explicitly wants the small SVG/PNG (40-60px) here, not
-				// the full-size logo. Fall back to ImageUrl only if missing.
+
 				'image_url' => (string) ( $cat_entry['small_image_url'] ?? $cat_entry['image_url'] ?? '' ),
-				// `position` is what /gateway/pinpay expects as `selected_method`
-				// — saving it on the snapshot lets redirect_url() emit the
-				// correct integer without re-fetching the methods catalog.
+
 				'position'  => (int) ( $cat_entry['position'] ?? 0 ),
 			];
 		}
@@ -483,9 +447,7 @@ class Addon extends \GFPaymentAddOn {
 	 * @param array<string, array<string, mixed>>         $methods_config
 	 */
 	private function render_methods_list( array $methods, array $methods_config ): void {
-		// We need to know which gateway is currently selected so the Activate
-		// button can pass it to IfthenpayEmailHelper (the activation email tells
-		// support which gateway needs the method provisioned).
+
 		$gateway_key = (string) ( $this->get_setting( 'gateway_key' ) ?? '' );
 		?>
 		<div class="iftp-gf-methods-list">
@@ -497,7 +459,7 @@ class Addon extends \GFPaymentAddOn {
 				$logo_url      = $method['image_url'] !== ''
 					? $method['image_url']
 					: 'https://gateway.ifthenpay.com/plugins/logotipos/small/' . strtolower( $entity_key ) . '.png';
-				// A method can only be enabled if it's provisioned on this gateway.
+
 				$is_enabled    = $is_provisioned && ! empty( $methods_config[ $entity_key ]['enabled'] );
 				$is_wide_logo  = $entity_key === 'CCARD';
 
@@ -553,8 +515,7 @@ class Addon extends \GFPaymentAddOn {
 	 * Custom settings field renderer for the global gateways overview table (plugin settings page).
 	 */
 	public function settings_iftp_gf_payment_methods_table( mixed $_field, bool $echo = true ): string {
-		// Fresh fetches — same calls used by the Feed Settings page. The
-		// per-request memoisation inside fetch_*() prevents duplicate hits.
+
 		$gateways          = $this->fetch_gravityforms_gateways();
 		$visible_methods   = $this->fetch_visible_methods_keyed();
 
@@ -634,8 +595,7 @@ class Addon extends \GFPaymentAddOn {
 			);
 		}
 
-		// Conflict warnings are surfaced via admin_notices (see render_admin_notices)
-		// because anything we return here REPLACES the feed list rows.
+
 		return false;
 	}
 
@@ -672,9 +632,7 @@ class Addon extends \GFPaymentAddOn {
 		);
 	}
 
-	// -------------------------------------------------------------------------
-	// Per-form payment info — saved on every feed save, read by the field
-	// -------------------------------------------------------------------------
+
 
 	/**
 	 * GF hook: called after the feed settings form is saved.
@@ -687,19 +645,34 @@ class Addon extends \GFPaymentAddOn {
 	 * @return int  The feed ID (pass-through).
 	 */
 	public function save_feed_settings( $feed_id, $form_id, $settings ) {
-		// GFPaymentAddOn reads $feed['meta']['transactionType'] in validation() and
-		// entry_post_save(); we don't expose subscriptions, so force 'product'
-		// (= one-time payment) on every save.
+
 		if ( empty( $settings['transactionType'] ) ) {
 			$settings['transactionType'] = 'product';
+		}
+
+
+		if ( ! empty( $settings['gateway_key'] ) ) {
+			$raw            = $settings['methods_config'] ?? [];
+			$methods_config = is_string( $raw ) ? (array) json_decode( $raw, true ) : (array) $raw;
+			$any_enabled    = false;
+			foreach ( $methods_config as $cfg ) {
+				if ( ! empty( $cfg['enabled'] ) ) {
+					$any_enabled = true;
+					break;
+				}
+			}
+			if ( ! $any_enabled ) {
+				\GFCommon::add_error_message(
+					__( 'Please enable at least one payment method before saving.', 'ifthenpay-payments-for-gravityforms' )
+				);
+				return false;
+			}
 		}
 
 		$result = parent::save_feed_settings( $feed_id, $form_id, $settings );
 		if ( $result ) {
 			$saved_feed_id = (int) $result;
-			// If another ifthenpay feed is already active on this form, force the
-			// just-saved feed to inactive. We never auto-deactivate the other one —
-			// the admin has to make that decision explicitly.
+
 			if ( $this->has_other_active_feed( (int) $form_id, $saved_feed_id ) ) {
 				$this->update_feed_active( $saved_feed_id, 0 );
 				\GFCommon::add_error_message(
@@ -769,8 +742,7 @@ class Addon extends \GFPaymentAddOn {
 			return;
 		}
 
-		// Pull the freshly-built rows for the gateway (visible methods × gateway accounts)
-		// and combine with the admin's checkbox state to emit the pay_methods array.
+
 		$method_rows         = $this->build_method_rows_for_gateway( $gateway_key );
 		$methods_config_raw  = $settings['methods_config'] ?? [];
 		$methods_config      = is_string( $methods_config_raw )
@@ -779,9 +751,7 @@ class Addon extends \GFPaymentAddOn {
 
 		$pay_methods = [];
 		foreach ( $method_rows as $row ) {
-			// Skip methods that aren't provisioned on this gateway — they only
-			// exist in the feed-settings UI to surface an Activate button and
-			// shouldn't end up in the per-form snapshot (nothing to pay with).
+
 			if ( (string) ( $row['account'] ?? '' ) === '' ) {
 				continue;
 			}
@@ -819,16 +789,12 @@ class Addon extends \GFPaymentAddOn {
 		return is_array( $data ) ? $data : [];
 	}
 
-	// -------------------------------------------------------------------------
-	// Payment processing
-	// -------------------------------------------------------------------------
+
 
 	public function get_submission_data( $feed, $form, $entry ): array {
 		$data = parent::get_submission_data( $feed, $form, $entry );
 
-		// Form-total auto-detection only — sum of pricing fields (product, total,
-		// quantity, shipping). Forms without any pricing field will resolve to 0
-		// and our validation filter will block the submission with a clear error.
+
 		if ( empty( $data['payment_amount'] ) || (float) $data['payment_amount'] <= 0 ) {
 			$amount = GFFormData::resolve_amount( $form, $entry );
 			if ( $amount > 0 ) {
@@ -843,7 +809,7 @@ class Addon extends \GFPaymentAddOn {
 		$form_id  = (int) rgar( $form, 'id' );
 		$entry_id = (int) rgar( $entry, 'id' );
 
-		// Refuse to process if another payment add-on also has an active feed on this form.
+
 		$competing = $this->get_competing_payment_addon_slugs( $form_id );
 		if ( ! empty( $competing ) ) {
 			$this->log_error( sprintf(
@@ -875,8 +841,7 @@ class Addon extends \GFPaymentAddOn {
 			return '';
 		}
 
-		// New schema: pay_methods is a flat list; the customer only pays with the ones
-		// the admin actively flagged via is_active=true on the feed-settings table.
+
 		$pay_methods = (array) ( $form_info['pay_methods'] ?? [] );
 		if ( empty( $pay_methods ) ) {
 			$this->log_error( __METHOD__ . '(): No pay_methods in form info for form #' . $form_id );
@@ -932,9 +897,7 @@ class Addon extends \GFPaymentAddOn {
 			'success_url'     => $urls['success_url'],
 			'error_url'       => $urls['error_url'],
 			'cancel_url'      => $urls['cancel_url'],
-			// API expects the Position number as a string (e.g. "4" for CCARD)
-			// — the ifthenpay sample payload puts it in quotes. Omit when zero
-			// so the gateway falls back to "first enabled".
+
 			'selected_method' => $selected_position > 0 ? (string) $selected_position : '',
 			'email'           => $customer_email,
 			'name'            => $customer_name,
@@ -957,8 +920,7 @@ class Addon extends \GFPaymentAddOn {
 			return '';
 		}
 
-		// Pay-By-Link / pinpay endpoint returns: PinpayUrl (hosted payment page),
-		// RedirectUrl (alternate redirect), PinCode (transaction reference).
+
 		$redirect_url   = (string) (
 			$response['PinpayUrl']
 			?? $response['RedirectUrl']
@@ -995,20 +957,18 @@ class Addon extends \GFPaymentAddOn {
 		}
 
 		gform_update_meta( $entry_id, 'iftp_gf_payment_status', 'pending' );
-		// Persist the resolved amount so handle_gateway_return() / webhook handler
-		// can feed it back into GFPaymentAddOn::complete_payment(). GF only sets
-		// payment_amount on the entry inside complete_payment(), not before.
+
 		gform_update_meta( $entry_id, 'iftp_gf_payment_amount', $amount );
 		\GFAPI::update_entry_property( $entry_id, 'payment_amount', $amount );
+
+		\GFAPI::update_entry_property( $entry_id, 'payment_status', 'Processing' );
 
 		$this->log_debug( __METHOD__ . "(): Entry #{$entry_id} → redirect to ifthenpay. TxID: {$transaction_id}" );
 
 		return $redirect_url;
 	}
 
-	// -------------------------------------------------------------------------
-	// Strict single-payment-gateway enforcement
-	// -------------------------------------------------------------------------
+
 
 	/**
 	 * Returns slugs of OTHER active payment add-ons that also have an active
@@ -1054,13 +1014,36 @@ class Addon extends \GFPaymentAddOn {
 			return $validation_result;
 		}
 
-		// Only act if this form actually uses ifthenpay (has an active feed of ours).
+
 		$our_feeds = $this->get_active_feeds( $form_id );
 		if ( empty( $our_feeds ) ) {
 			return $validation_result;
 		}
 
-		// (1) Competing payment add-on check.
+
+		if ( self::get_backoffice_key() === '' ) {
+			return $this->fail_validation_on_field(
+				$validation_result,
+				$form,
+				__( 'Payment is not available: ifthenpay is not connected. Please contact the site administrator.', 'ifthenpay-payments-for-gravityforms' )
+			);
+		}
+
+
+		$form_info      = self::get_form_payment_info( $form_id );
+		$active_methods = array_filter(
+			(array) ( $form_info['pay_methods'] ?? [] ),
+			static fn( array $m ): bool => ! empty( $m['is_active'] )
+		);
+		if ( empty( $active_methods ) ) {
+			return $this->fail_validation_on_field(
+				$validation_result,
+				$form,
+				__( 'Payment is not available: no payment methods are enabled for this form. Please contact the site administrator.', 'ifthenpay-payments-for-gravityforms' )
+			);
+		}
+
+
 		$competing = $this->get_competing_payment_addon_slugs( $form_id );
 		if ( ! empty( $competing ) ) {
 			return $this->fail_validation_on_field(
@@ -1074,9 +1057,7 @@ class Addon extends \GFPaymentAddOn {
 			);
 		}
 
-		// (2) Amount sanity check — GF's GFPaymentAddOn::validation() will silently
-		// skip our redirect_url() if the resolved amount is zero. Catch that here
-		// so the admin/customer sees a real error instead of a no-op submit.
+
 		$entry           = \GFFormsModel::get_current_lead( $form );
 		$active_feed     = $our_feeds[0];
 		$submission_data = $this->get_submission_data( $active_feed, $form, $entry );
@@ -1143,8 +1124,7 @@ class Addon extends \GFPaymentAddOn {
 		$status = sanitize_key( wp_unslash( (string) $_GET['iftp_gf_status'] ) );
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
-		// Ensure the banner CSS loads even when the form has no iftp_pbl field
-		// (the field's render hook is what normally enqueues frontend.css).
+
 		if ( ! wp_style_is( 'ifthenpay-gf-frontend', 'enqueued' ) ) {
 			wp_enqueue_style(
 				'ifthenpay-gf-frontend',
@@ -1193,17 +1173,7 @@ class Addon extends \GFPaymentAddOn {
 		return $banner . $form_string;
 	}
 
-	// -------------------------------------------------------------------------
-	// Server-to-server webhook handler (MemberPress pattern)
-	//
-	// Trigger param: ?iftp_gf_callback=1
-	// SUCCESS payload:  ?iftp_gf_callback=1&ref={entry_id}&apk={base64(gateway_key)}&val={amount}&mtd={...}&req={request_id}
-	// FAILURE payload:  ?iftp_gf_callback=1&ref={entry_id}&status={cancelled|error}
-	//
-	// Validates the call against entry meta written by redirect_url() and only
-	// then flips the entry through complete_payment() / fail_payment().
-	// Always exits with a JSON-ish status code — no HTML, no redirect.
-	// -------------------------------------------------------------------------
+
 
 	public function handle_gateway_callback(): void {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- server-to-server callback validated by entry-meta crosscheck
@@ -1232,7 +1202,7 @@ class Addon extends \GFPaymentAddOn {
 			exit( 'Entry not found' );
 		}
 
-		// Failure callback: ?status=cancelled|error
+
 		if ( ! empty( $_GET['status'] ) ) {
 			$status = sanitize_text_field( wp_unslash( (string) $_GET['status'] ) );
 			if ( ! in_array( $status, [ 'cancelled', 'error' ], true ) ) {
@@ -1264,7 +1234,7 @@ class Addon extends \GFPaymentAddOn {
 			exit( 'OK' );
 		}
 
-		// Success callback: ?ref=&apk=&val=&mtd=&req=
+
 		foreach ( [ 'apk', 'val', 'mtd', 'req' ] as $required ) {
 			if ( ! isset( $_GET[ $required ] ) ) {
 				status_header( 400 );
@@ -1277,7 +1247,7 @@ class Addon extends \GFPaymentAddOn {
 		$mtd = sanitize_text_field( wp_unslash( (string) ( $_GET['mtd'] ?? '' ) ) );
 		$req = sanitize_text_field( wp_unslash( (string) ( $_GET['req'] ?? '' ) ) );
 
-		// Validate gateway key — apk = base64(gateway_key) (MemberPress convention).
+
 		$decoded_apk      = trim( (string) base64_decode( $apk, true ) );
 		$expected_gateway = (string) gform_get_meta( $ref, 'iftp_gf_gateway_key' );
 		if ( $decoded_apk === '' || $decoded_apk !== $expected_gateway ) {
@@ -1285,21 +1255,21 @@ class Addon extends \GFPaymentAddOn {
 			exit( 'apk mismatch' );
 		}
 
-		// Validate amount.
+
 		$expected_amount = (float) gform_get_meta( $ref, 'iftp_gf_payment_amount' );
 		if ( $expected_amount <= 0 || (float) $val !== $expected_amount ) {
 			status_header( 403 );
 			exit( 'amount mismatch' );
 		}
 
-		// Validate method against the live available-methods list (fresh).
+
 		$catalog = $this->fetch_visible_methods_keyed();
 		if ( ! isset( $catalog[ strtoupper( $mtd ) ] ) && ! is_numeric( $mtd ) ) {
 			status_header( 403 );
 			exit( 'method invalid' );
 		}
 
-		// Idempotency.
+
 		$existing = (string) gform_get_meta( $ref, 'iftp_gf_payment_status' );
 		if ( $existing === 'paid' ) {
 			status_header( 200 );
@@ -1320,9 +1290,7 @@ class Addon extends \GFPaymentAddOn {
 		exit( 'OK' );
 	}
 
-	// -------------------------------------------------------------------------
-	// Gateway return handler (called on 'wp' action)
-	// -------------------------------------------------------------------------
+
 
 	public function handle_gateway_return(): void {
 		$return_data = IfthenpayReturn::get_return_data_from_request();
@@ -1342,7 +1310,7 @@ class Addon extends \GFPaymentAddOn {
 			return;
 		}
 
-		// Idempotency guard — gateway sometimes hits the return URL twice.
+
 		$existing = (string) gform_get_meta( $entry_id, 'iftp_gf_payment_status' );
 		if ( in_array( $existing, [ 'paid', 'failed', 'cancelled' ], true ) ) {
 			$this->redirect_after_return( $entry, $existing );
@@ -1350,7 +1318,7 @@ class Addon extends \GFPaymentAddOn {
 		}
 
 		$context = IfthenpayReturn::resolve_return_context( $return_data );
-		// Resolve amount: entry property first, then our redirect_url snapshot meta.
+
 		$amount = (float) rgar( $entry, 'payment_amount' );
 		if ( $amount <= 0 ) {
 			$amount = (float) gform_get_meta( $entry_id, 'iftp_gf_payment_amount' );
@@ -1385,7 +1353,7 @@ class Addon extends \GFPaymentAddOn {
 				gform_update_meta( $entry_id, 'iftp_gf_payment_status', 'paid' );
 				$flash = 'paid';
 			} else {
-				// No transaction_id on callback URL, or verify_transaction_paid returned 404 — payment failed.
+
 				$this->fail_payment( $entry, [
 					'transaction_id' => $tx,
 					'amount'         => $amount,
@@ -1435,9 +1403,7 @@ class Addon extends \GFPaymentAddOn {
 		exit;
 	}
 
-	// -------------------------------------------------------------------------
-	// AJAX: connect / disconnect backoffice key
-	// -------------------------------------------------------------------------
+
 
 	public function ajax_connect_backoffice(): void {
 		check_ajax_referer( 'iftp_gf_admin', 'nonce' );
@@ -1458,10 +1424,7 @@ class Addon extends \GFPaymentAddOn {
 			wp_send_json_error( [ 'message' => __( 'Invalid Backoffice Key format.', 'ifthenpay-payments-for-gravityforms' ) ], 400 );
 		}
 
-		// Single API call — confirms the key resolves to at least one GravityForms-type
-		// gateway. Catalog data is NOT cached; the Feed Settings page re-fetches on every
-		// render. Saving the WordPress settings later won't re-trigger this — it only runs
-		// when the customer explicitly clicks Connect.
+
 		try {
 			$gateway_rows = ( new IfthenpayClient( $backoffice_key ) )->get_gateway_keys( self::GATEWAY_TYPE );
 		} catch ( \Throwable ) {
@@ -1497,7 +1460,7 @@ class Addon extends \GFPaymentAddOn {
 
 		delete_option( self::OPTION_BACKOFFICE_KEY );
 
-		// Remove all per-form payment snapshots in one sweep.
+
 		global $wpdb;
 		$wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$wpdb->prepare(
@@ -1512,14 +1475,7 @@ class Addon extends \GFPaymentAddOn {
 		] );
 	}
 
-	// -------------------------------------------------------------------------
-	// AJAX: request method activation email
-	//
-	// Fires when the admin clicks "Request Activation" next to a method that
-	// is visible in the catalog but not provisioned on the selected gateway.
-	// Sends a templated email via IfthenpayEmailHelper to ifthenpay support
-	// with the gateway/method context. 24h cooldown per (gateway, entity).
-	// -------------------------------------------------------------------------
+
 
 	public function ajax_activate_payment_method(): void {
 		check_ajax_referer( 'iftp_gf_admin', 'nonce' );
@@ -1559,9 +1515,7 @@ class Addon extends \GFPaymentAddOn {
 		wp_send_json_success( [ 'message' => __( 'Activation request sent to ifthenpay support.', 'ifthenpay-payments-for-gravityforms' ) ] );
 	}
 
-	// -------------------------------------------------------------------------
-	// Private: render connection status card HTML (used by AJAX responses)
-	// -------------------------------------------------------------------------
+
 
 	private function render_connection_card_html(): string {
 		$is_connected = self::get_backoffice_key() !== '';
@@ -1583,20 +1537,13 @@ class Addon extends \GFPaymentAddOn {
 		return (string) ob_get_clean();
 	}
 
-	// -------------------------------------------------------------------------
-	// Static helpers
-	// -------------------------------------------------------------------------
+
 
 	public static function get_backoffice_key(): string {
 		return trim( (string) get_option( self::OPTION_BACKOFFICE_KEY, '' ) );
 	}
 
-	// -------------------------------------------------------------------------
-	// Fresh API fetches — called inline by feed-settings render.
-	// No caching: every Feed Settings page load hits these two endpoints exactly
-	// once. Per-request memoisation prevents the same request from calling them
-	// twice when the rendering pipeline visits multiple settings fields.
-	// -------------------------------------------------------------------------
+
 
 	/**
 	 * Calls GET /gateway/get?type=GravityForms and returns the raw row list.
@@ -1698,7 +1645,7 @@ class Addon extends \GFPaymentAddOn {
 			strtolower( $method_label ),
 		] ) );
 
-		// MB <-> Multibanco compatibility, mirrors the gateway's column naming.
+
 		if ( strtoupper( $entity ) === 'MB' || strtoupper( $method_label ) === 'MULTIBANCO' ) {
 			$candidates[] = 'Multibanco';
 			$candidates[] = 'MULTIBANCO';
@@ -1764,7 +1711,7 @@ class Addon extends \GFPaymentAddOn {
 		foreach ( $this->fetch_visible_methods_keyed() as $entity => $cat_entry ) {
 			$account = $this->resolve_account_in_row( $row, $entity, (string) ( $cat_entry['label'] ?? '' ) );
 			if ( $account === '' ) {
-				continue; // not provisioned for this gateway
+				continue;
 			}
 			$choices[] = [
 				'label' => (string) ( $cat_entry['label'] ?? $entity ),

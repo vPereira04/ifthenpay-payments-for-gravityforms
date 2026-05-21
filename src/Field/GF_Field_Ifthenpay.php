@@ -45,11 +45,7 @@ class GF_Field_Ifthenpay extends \GF_Field {
 		return false;
 	}
 
-	// -------------------------------------------------------------------------
-	// Field rendering — passive preview only (no payment UI).
-	// After form submit, GFPaymentAddOn::redirect_url() sends the user to the
-	// ifthenpay payment page. Same flow as MemberPress / GF Stripe checkout.
-	// -------------------------------------------------------------------------
+
 
 	public function get_field_input( $form, $value = '', $entry = null ): string {
 		if ( $this->is_form_editor() ) {
@@ -60,10 +56,7 @@ class GF_Field_Ifthenpay extends \GF_Field {
 			return $this->get_entry_detail_display( (string) $value );
 		}
 
-		// Belt-and-suspenders CSS enqueue: the GF addon framework's field_types
-		// rule should cover this, but some themes / page-builders render forms
-		// outside the standard enqueue chain. Registering at render time is safe
-		// (wp_enqueue_style is idempotent) and guarantees the styles load.
+
 		if ( ! wp_style_is( 'ifthenpay-gf-frontend', 'enqueued' ) ) {
 			wp_enqueue_style(
 				'ifthenpay-gf-frontend',
@@ -83,6 +76,12 @@ class GF_Field_Ifthenpay extends \GF_Field {
 		) );
 
 		if ( empty( $active_methods ) ) {
+			if ( Addon::get_backoffice_key() === '' ) {
+				return '<p class="gfield_description">'
+					. esc_html__( 'Payment is not available: ifthenpay is not connected. Please contact the site administrator.', 'ifthenpay-payments-for-gravityforms' )
+					. '</p>';
+			}
+
 			$feeds = \GFAPI::get_feeds( null, $form_id, 'iftp_gf' );
 			$has_active_feed = false;
 			if ( is_array( $feeds ) ) {
@@ -99,7 +98,7 @@ class GF_Field_Ifthenpay extends \GF_Field {
 					. '</p>';
 			}
 			return '<p class="gfield_description">'
-				. esc_html__( 'Payment is not available at this time. Please contact the site administrator.', 'ifthenpay-payments-for-gravityforms' )
+				. esc_html__( 'No payment methods are enabled for this form. Go to Form Settings → ifthenpay to enable at least one payment method.', 'ifthenpay-payments-for-gravityforms' )
 				. '</p>';
 		}
 
@@ -159,17 +158,14 @@ class GF_Field_Ifthenpay extends \GF_Field {
 		return (string) ob_get_clean();
 	}
 
-	// -------------------------------------------------------------------------
-	// No client-side validation — GFPaymentAddOn handles payment status via
-	// gateway callback after the redirect.
-	// -------------------------------------------------------------------------
+
 
 	public function validate( $value, $form ): void {
-		// Intentionally empty; payment is processed off-site after submission.
+
 	}
 
 	public function get_value_save_entry( $value, $form, $input_name, $lead_id, $lead ) {
-		// Transaction ID is written into entry meta by redirect_url() / gateway return handler.
+
 		return '';
 	}
 
@@ -177,9 +173,7 @@ class GF_Field_Ifthenpay extends \GF_Field {
 		return esc_html( (string) $value );
 	}
 
-	// -------------------------------------------------------------------------
-	// Editor preview
-	// -------------------------------------------------------------------------
+
 
 	private function get_editor_preview(): string {
 		ob_start();

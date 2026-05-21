@@ -34,9 +34,7 @@ final class IfthenpayClient {
 		$this->backoffice_key = sanitize_text_field( $backoffice_key );
 	}
 
-	// -------------------------------------------------------------------------
-	// Connect — validate the backoffice key
-	// -------------------------------------------------------------------------
+
 
 	/**
 	 * One-shot key-validity probe used by the Connect button.
@@ -58,9 +56,7 @@ final class IfthenpayClient {
 		}
 	}
 
-	// -------------------------------------------------------------------------
-	// Feed settings — called every time the page renders (no caching)
-	// -------------------------------------------------------------------------
+
 
 	/**
 	 * Returns the gateway-key rows for this backoffice key, scoped to the
@@ -90,9 +86,7 @@ final class IfthenpayClient {
 		return self::request( 'GET', self::API_BASE . '/gateway/methods/available' );
 	}
 
-	// -------------------------------------------------------------------------
-	// Payment — Pay-By-Link creation
-	// -------------------------------------------------------------------------
+
 
 	/**
 	 * POSTs the Pay-By-Link payload and returns the gateway response
@@ -114,9 +108,7 @@ final class IfthenpayClient {
 		);
 	}
 
-	// -------------------------------------------------------------------------
-	// Payment — verify the customer actually paid
-	// -------------------------------------------------------------------------
+
 
 	/**
 	 * Authoritative "did the customer actually pay" check.
@@ -153,9 +145,7 @@ final class IfthenpayClient {
 		}
 	}
 
-	// -------------------------------------------------------------------------
-	// HTTP plumbing
-	// -------------------------------------------------------------------------
+
 
 	/**
 	 * @param array<string, mixed> $args
