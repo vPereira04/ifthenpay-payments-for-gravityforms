@@ -235,8 +235,8 @@ select option:disabled {
     content: "";
     font-family: initial;
     display: inline-block;
-    width: 24px;
-    height: 23px;
+    width: 34px;
+    height: 34px;
     background-image: url('../images/ifthenpay-icon.svg');
     background-size: contain;
     background-repeat: no-repeat;
@@ -245,8 +245,8 @@ select option:disabled {
 
 .ifthenpay-small-icon {
     display: inline-block;
-    width: 20px;
-    height: 20px;
+    width: 34px;
+    height: 34px;
     background-color: currentcolor;
     mask: url('../images/ifthenpay-small-icon.svg') no-repeat center / contain;
 }

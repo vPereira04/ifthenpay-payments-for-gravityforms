@@ -241,84 +241,71 @@
 }
 
 /* -------------------------------------------------------------------------
-   Payment-status banner (Stripe-style)
-   Injected by gform_get_form_filter when the customer returns from the
-   gateway with ?iftp_gf_status=paid|failed|cancelled.
+   Payment-status banner (returned from gateway with ?iftp_gf_status=...)
+
+   Error / cancel states use GF's native .gform_validation_errors structure —
+   GF's own theme CSS already handles red colouring and the icon font.
+   Success / info states use .gform_confirmation_wrapper with colour
+   overrides below; the icon is rendered by GF's gform-icon font.
    ------------------------------------------------------------------------- */
 
-.iftp-gf-payment-banner {
+/* Layout for confirmation-style (success / info) notices */
+.iftp-gf-return-notice .gform_confirmation_message {
 	display: flex;
 	align-items: flex-start;
-	gap: 12px;
+	gap: 10px;
 	margin: 0 0 20px;
 	padding: 14px 16px;
-	border-radius: var(--gf-radius, 6px);
+	border-radius: var(--gf-radius, 4px);
 	border: 1px solid transparent;
 	font-size: var(--gf-font-size-secondary, 14px);
-	line-height: 1.4;
+	line-height: 1.5;
 }
 
-.iftp-gf-payment-banner__icon {
-	flex-shrink: 0;
-	width: 22px;
-	height: 22px;
-	border-radius: 50%;
-	background-position: center;
-	background-repeat: no-repeat;
-	background-size: 14px 14px;
-}
-
-.iftp-gf-payment-banner__text {
+.iftp-gf-return-notice-text {
 	display: flex;
 	flex-direction: column;
-	gap: 2px;
+	gap: 3px;
 }
 
-.iftp-gf-payment-banner__text strong {
-	font-weight: 600;
+/* Icon sizing — colour set per-variant below */
+.iftp-gf-return-icon {
+	flex-shrink: 0;
+	font-size: 18px;
+	line-height: 1;
+	margin-top: 1px;
 }
 
-.iftp-gf-payment-banner.is-success {
+/* success (paid) */
+.iftp-gf-return-notice--success .gform_confirmation_message {
 	background: #ecfdf5;
 	border-color: #a7f3d0;
 	color: #065f46;
 }
+.iftp-gf-return-notice--success .iftp-gf-return-icon { color: #10b981; }
 
-.iftp-gf-payment-banner.is-success .iftp-gf-payment-banner__icon {
-	background-color: #10b981;
-	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23fff'><path fill-rule='evenodd' d='M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 011.4-1.4L9 11.6l6.3-6.3a1 1 0 011.4 0z' clip-rule='evenodd'/></svg>");
-}
-
-.iftp-gf-payment-banner.is-error {
-	background: #fef2f2;
-	border-color: #fecaca;
-	color: #991b1b;
-}
-
-.iftp-gf-payment-banner.is-error .iftp-gf-payment-banner__icon {
-	background-color: #ef4444;
-	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23fff'><path fill-rule='evenodd' d='M4.3 4.3a1 1 0 011.4 0L10 8.6l4.3-4.3a1 1 0 111.4 1.4L11.4 10l4.3 4.3a1 1 0 11-1.4 1.4L10 11.4l-4.3 4.3a1 1 0 11-1.4-1.4L8.6 10 4.3 5.7a1 1 0 010-1.4z' clip-rule='evenodd'/></svg>");
-}
-
-.iftp-gf-payment-banner.is-cancel {
-	background: #fffbeb;
-	border-color: #fde68a;
-	color: #92400e;
-}
-
-.iftp-gf-payment-banner.is-cancel .iftp-gf-payment-banner__icon {
-	background-color: #f59e0b;
-	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23fff'><path fill-rule='evenodd' d='M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 012 0v4a1 1 0 11-2 0V9zm1-4a1 1 0 100 2 1 1 0 000-2z' clip-rule='evenodd'/></svg>");
-}
-
-/* Pending: payment reference generated, awaiting webhook confirmation */
-.iftp-gf-payment-banner.is-info {
+/* info (pending) */
+.iftp-gf-return-notice--info .gform_confirmation_message {
 	background: #eff6ff;
 	border-color: #bfdbfe;
 	color: #1e3a8a;
 }
+.iftp-gf-return-notice--info .iftp-gf-return-icon { color: #3b82f6; }
 
-.iftp-gf-payment-banner.is-info .iftp-gf-payment-banner__icon {
-	background-color: #3b82f6;
-	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23fff'><path fill-rule='evenodd' d='M10 18a8 8 0 100-16 8 8 0 000 16zm.75-12a.75.75 0 00-1.5 0v4.5l3 1.5a.75.75 0 10.67-1.34l-2.17-1.08V6z' clip-rule='evenodd'/></svg>");
+/* cancel — override GF's default red to amber/warning */
+.iftp-gf-return-notice--cancel.gform_validation_errors {
+	background: #fffbeb;
+	border-color: #fde68a;
+	color: #92400e;
+}
+.iftp-gf-return-notice--cancel .iftp-gf-return-icon { color: #f59e0b; }
+
+/* error — GF's gform_validation_errors already provides red styling */
+.iftp-gf-return-notice--error .iftp-gf-return-icon { color: inherit; }
+
+/* Body paragraph inside error/cancel notices */
+.iftp-gf-return-notice-body {
+	margin: 6px 0 0;
+	font-size: var(--gf-font-size-tertiary, 13px);
+	opacity: 0.88;
 }
