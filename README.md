@@ -24,7 +24,7 @@ Adds ifthenpay payment methods to GravityForms: cards, wallets, and local paymen
 - [Support](#support)
 
 ---
- 
+
 ## Description
 
 This plugin integrates the ifthenpay payment gateway with GravityForms to enable seamless payment collection directly from your forms.
@@ -86,7 +86,7 @@ Before getting started, make sure you have:
 * GravityForms installed and activated.
 * HTTPS (SSL) enabled on your site.
 
-> **Tip:** If your site still does not use HTTPS, now is probably a good time.
+> **Tip:** If your site still does not use HTTPS, now is probably a good time to do so.
 
 ---
 
@@ -239,8 +239,6 @@ Yes. You can configure display mode, button labels, descriptions, and styling op
 ifthenpay may provide test entities for development and testing purposes.
 
 If unavailable, we recommend using a low-value live transaction.
-
-Maybe not your largest transaction on the first attempt.
 
 </details>
 

@@ -110,9 +110,9 @@ class Addon extends \GFPaymentAddOn {
 	public function init_ajax(): void {
 		parent::init_ajax();
 
-
 		add_action( 'wp_ajax_iftp_gf_connect_backoffice',    [ $this, 'ajax_connect_backoffice' ] );
 		add_action( 'wp_ajax_iftp_gf_disconnect_backoffice', [ $this, 'ajax_disconnect_backoffice' ] );
+		add_action( 'wp_ajax_iftp_gf_get_methods_table',     [ $this, 'ajax_get_methods_table' ] );
 		add_action( 'wp_ajax_iftp_gf_activate_method',       [ $this, 'ajax_activate_payment_method' ] );
 	}
 
@@ -146,6 +146,7 @@ class Addon extends \GFPaymentAddOn {
 					'activation_sending'  => __( 'Sending...', 'ifthenpay-payments-for-gravityforms' ),
 					'activation_sent'     => __( 'Activation request sent.', 'ifthenpay-payments-for-gravityforms' ),
 					'activation_cooldown' => __( 'Request already sent. Please wait 24 hours.', 'ifthenpay-payments-for-gravityforms' ),
+					'methods_loading'     => __( 'Loading payment methods…', 'ifthenpay-payments-for-gravityforms' ),
 				],
 				'enqueue' => [
 					[ 'admin_page' => [ 'plugin_settings' ] ],
@@ -312,12 +313,8 @@ class Addon extends \GFPaymentAddOn {
 	public function settings_iftp_gf_methods_table( mixed $_field, bool $echo = true ): string {
 		$gateway_key = (string) ( $this->get_setting( 'gateway_key' ) ?? '' );
 
-
-		$methods         = $this->build_method_rows_for_gateway( $gateway_key );
-		$methods_config  = $this->read_methods_config_from_active_feed();
-
-
-		$this->inject_feed_settings_client_data();
+		$methods        = $this->build_method_rows_for_gateway( $gateway_key );
+		$methods_config = $this->read_methods_config_from_active_feed();
 
 		ob_start();
 		?>
@@ -342,71 +339,6 @@ class Addon extends \GFPaymentAddOn {
 		}
 
 		return $html;
-	}
-
-	/**
-	 * Attaches `window.iftpGfFeedData` to the admin.js handle. The JS uses it
-	 * to rebuild the methods table client-side when the gateway dropdown
-	 * changes — zero extra API hits, the page-load fetches are the entirety
-	 * of the data we need.
-	 */
-	private function inject_feed_settings_client_data(): void {
-		static $injected = false;
-		if ( $injected ) {
-			return;
-		}
-		$injected = true;
-
-		$visible = $this->fetch_visible_methods_keyed();
-
-		$methods = [];
-		foreach ( $visible as $entity => $cat_entry ) {
-			$small_url      = (string) ( $cat_entry['small_image_url'] ?? '' );
-			$full_url       = (string) ( $cat_entry['image_url'] ?? '' );
-			$small_dark_url = (string) ( $cat_entry['small_image_url_dark'] ?? '' );
-			$methods[] = [
-				'entity'        => $entity,
-				'label'         => (string) ( $cat_entry['label'] ?? $entity ),
-				'img_url'       => $small_url !== '' ? $small_url : ( $full_url !== '' ? $full_url : 'https://gateway.ifthenpay.com/plugins/logotipos/small/' . strtolower( $entity ) . '.png' ),
-				'img_url_dark'  => $small_dark_url,
-				'allow_default' => (bool) ( $cat_entry['allow_selected_method'] ?? true ),
-			];
-		}
-
-		$gateway_accounts = [];
-		foreach ( $this->fetch_gravityforms_gateways() as $row ) {
-			$key = (string) ( $row['GatewayKey'] ?? '' );
-			if ( $key === '' ) {
-				continue;
-			}
-			$entries = [];
-			foreach ( $visible as $entity => $cat_entry ) {
-				$account = $this->resolve_account_in_row( $row, $entity, (string) ( $cat_entry['label'] ?? '' ) );
-				if ( $account !== '' ) {
-					$entries[ $entity ] = $account;
-				}
-			}
-			$gateway_accounts[ $key ] = $entries;
-		}
-
-		$data = [
-			'methods'         => $methods,
-			'gatewayAccounts' => $gateway_accounts,
-			'strings'         => [
-				'selectGateway'     => __( 'Select a gateway key above to load available payment methods.', 'ifthenpay-payments-for-gravityforms' ),
-				'noMethods'         => __( 'No payment methods are provisioned on this gateway.', 'ifthenpay-payments-for-gravityforms' ),
-				'notActivated'      => __( 'Not activated', 'ifthenpay-payments-for-gravityforms' ),
-				'requestActivation' => __( 'Request Activation', 'ifthenpay-payments-for-gravityforms' ),
-				'provisioned'       => __( 'Provisioned', 'ifthenpay-payments-for-gravityforms' ),
-				'autoMethod'        => __( '— Auto (first enabled method) —', 'ifthenpay-payments-for-gravityforms' ),
-			],
-		];
-
-		wp_add_inline_script(
-			'ifthenpay_gf_admin',
-			'window.iftpGfFeedData = ' . wp_json_encode( $data ) . ';',
-			'before'
-		);
 	}
 
 	/**
@@ -1493,6 +1425,53 @@ class Addon extends \GFPaymentAddOn {
 		wp_send_json_success( [
 			'message'     => __( 'Backoffice Key disconnected.', 'ifthenpay-payments-for-gravityforms' ),
 			'status_html' => $this->render_connection_card_html(),
+		] );
+	}
+
+
+
+	public function ajax_get_methods_table(): void {
+		check_ajax_referer( 'iftp_gf_admin', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'ifthenpay-payments-for-gravityforms' ) ], 403 );
+		}
+
+		$gateway_key = sanitize_text_field( wp_unslash( (string) ( $_POST['gateway_key'] ?? '' ) ) );
+
+
+		$methods = $gateway_key !== '' ? $this->build_method_rows_for_gateway( $gateway_key ) : [];
+
+		ob_start();
+		if ( $gateway_key === '' ) {
+			echo '<p class="iftp-gf-no-methods">' . esc_html__( 'Select a gateway key above to load available payment methods.', 'ifthenpay-payments-for-gravityforms' ) . '</p>';
+		} elseif ( empty( $methods ) ) {
+			echo '<p class="iftp-gf-no-methods">' . esc_html__( 'No payment methods are provisioned on this gateway.', 'ifthenpay-payments-for-gravityforms' ) . '</p>';
+		} else {
+			$this->render_methods_list( $methods, [] );
+		}
+		$table_html = (string) ob_get_clean();
+
+
+		$default_options = '<option value="">' . esc_html__( '— Auto (first enabled method) —', 'ifthenpay-payments-for-gravityforms' ) . '</option>';
+		if ( $gateway_key !== '' ) {
+			$row = $this->find_gateway_row( $gateway_key );
+			if ( $row !== null ) {
+				foreach ( $this->fetch_visible_methods_keyed() as $entity => $cat_entry ) {
+					$account = $this->resolve_account_in_row( $row, $entity, (string) ( $cat_entry['label'] ?? '' ) );
+					if ( $account === '' ) {
+						continue;
+					}
+					$default_options .= '<option value="' . esc_attr( $entity ) . '">'
+						. esc_html( (string) ( $cat_entry['label'] ?? $entity ) )
+						. '</option>';
+				}
+			}
+		}
+
+		wp_send_json_success( [
+			'table_html'      => $table_html,
+			'default_options' => $default_options,
 		] );
 	}
 

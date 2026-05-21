@@ -212,163 +212,55 @@
 
 
 
-	function escapeHtml(str) {
-		return String(str == null ? '' : str)
-			.replace(/&/g, '&amp;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;')
-			.replace(/"/g, '&quot;')
-			.replace(/'/g, '&#039;');
-	}
-
-	function renderMethodsListHtml(gatewayKey, feedData) {
-		if (!feedData || !Array.isArray(feedData.methods)) {
-			return '';
-		}
-		const accounts = feedData.gatewayAccounts[gatewayKey] || {};
-
-		const items = feedData.methods
-			.map(function (m) {
-				const account = accounts[m.entity] || '';
-				const isProvisioned = account !== '';
-				const isWideLogo = m.entity === 'CCARD';
-				const itemClasses =
-					'iftp-gf-method-item' +
-					(isProvisioned ? '' : ' is-unactivated');
-
-				const checkbox =
-					'<input type="checkbox" ' +
-					'name="_gform_setting_methods_config[' +
-					escapeHtml(m.entity) +
-					'][enabled]" value="1" class="iftp-gf-method-toggle" ' +
-					'data-entity="' +
-					escapeHtml(m.entity) +
-					'"' +
-					(isProvisioned ? '' : ' disabled') +
-					' />';
-
-				const hidden =
-					'<input type="hidden" ' +
-					'name="_gform_setting_methods_config[' +
-					escapeHtml(m.entity) +
-					'][account]" value="' +
-					escapeHtml(account) +
-					'" />';
-
-				const right = isProvisioned
-					? '<code class="iftp-gf-account-code">' +
-						escapeHtml(account) +
-						'</code><span class="iftp-gf-active-badge" title="' +
-						escapeHtml(feedData.strings.provisioned) +
-						'">&#10003;</span>'
-					: '<em class="iftp-gf-no-account">' +
-						escapeHtml(feedData.strings.notActivated) +
-						'</em><button type="button" class="button button-small iftp-gf-activate-method" data-entity="' +
-						escapeHtml(m.entity) +
-						'" data-gateway-key="' +
-						escapeHtml(gatewayKey) +
-						'">' +
-						escapeHtml(feedData.strings.requestActivation) +
-						'</button>';
-
-				return (
-					'<div class="' +
-					itemClasses +
-					'" data-entity="' +
-					escapeHtml(m.entity) +
-					'">' +
-					'<label class="iftp-gf-method-item-label">' +
-					checkbox +
-					hidden +
-					'<span class="iftp-gf-method-icon-wrap' +
-					(isWideLogo ? ' is-wide' : '') +
-					'"><img src="' +
-					escapeHtml(m.img_url) +
-					'" alt="' +
-					escapeHtml(m.label) +
-					'" loading="lazy" /></span>' +
-					'<span class="iftp-gf-method-name">' +
-					escapeHtml(m.label) +
-					'</span>' +
-					'</label>' +
-					'<div class="iftp-gf-method-right">' +
-					right +
-					'</div>' +
-					'</div>'
-				);
-			})
-			.join('');
-
-		return '<div class="iftp-gf-methods-list">' + items + '</div>';
-	}
-
-	function rebuildDefaultMethodDropdown(gatewayKey, feedData) {
-		const $select = $('[name="_gform_setting_default_method"]');
-		if (!$select.length || !feedData) {
-			return;
-		}
-		const accounts = feedData.gatewayAccounts[gatewayKey] || {};
-		const currentVal = $select.val();
-
-		let html =
-			'<option value="">' +
-			escapeHtml(feedData.strings.autoMethod) +
-			'</option>';
-		feedData.methods.forEach(function (m) {
-
-			if (!accounts[m.entity]) {
-				return;
-			}
-			html +=
-				'<option value="' +
-				escapeHtml(m.entity) +
-				'">' +
-				escapeHtml(m.label) +
-				'</option>';
-		});
-		$select.html(html);
-
-
-		if (
-			currentVal &&
-			$select.find('option[value="' + currentVal + '"]').length
-		) {
-			$select.val(currentVal);
-		}
-	}
-
 	$(document).on(
 		'change',
 		'select[name="_gform_setting_gateway_key"]',
 		function () {
-			const feedData = window.iftpGfFeedData;
-			if (!feedData) {
-				return;
-			}
 			const newKey = $(this).val() || '';
 			const $wrapper = $('#iftp-gf-methods-table-wrapper');
+			const $defaultSelect = $('[name="_gform_setting_default_method"]');
 			if (!$wrapper.length) {
 				return;
 			}
 
-			if (!newKey) {
-				$wrapper.html(
-					'<p class="iftp-gf-no-methods">' +
-						escapeHtml(feedData.strings.selectGateway) +
-						'</p>'
-				);
-			} else {
-				const listHtml = renderMethodsListHtml(newKey, feedData);
-				$wrapper.html(
-					listHtml ||
-						'<p class="iftp-gf-no-methods">' +
-							escapeHtml(feedData.strings.noMethods) +
-							'</p>'
-				);
-			}
+			$wrapper.html(
+				'<p class="iftp-gf-loading">' +
+					(strings.methods_loading || 'Loading...') +
+					'</p>'
+			);
 
-			rebuildDefaultMethodDropdown(newKey, feedData);
-			syncDefaultMethodDropdown();
+			$.post(
+				ajaxUrl,
+				{
+					action: 'iftp_gf_get_methods_table',
+					nonce: nonce,
+					gateway_key: newKey,
+				},
+				null,
+				'json'
+			)
+				.done(function (res) {
+					if (res && res.success) {
+						$wrapper.html(res.data.table_html);
+						if ($defaultSelect.length) {
+							$defaultSelect.html(res.data.default_options);
+						}
+						syncDefaultMethodDropdown();
+					} else {
+						$wrapper.html(
+							'<p class="iftp-gf-no-methods">' +
+								(strings.generic_error || 'Error loading methods.') +
+								'</p>'
+						);
+					}
+				})
+				.fail(function () {
+					$wrapper.html(
+						'<p class="iftp-gf-no-methods">' +
+							(strings.generic_error || 'Error loading methods.') +
+							'</p>'
+					);
+				});
 		}
 	);
 
