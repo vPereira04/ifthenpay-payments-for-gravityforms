@@ -122,7 +122,7 @@ final class IfthenpayClient {
 	 * Authoritative "did the customer actually pay" check.
 	 *
 	 * Hits GET /gateway/transaction/status/get?transactionId=...
-	 *  • 200 OK  → returns the body, e.g. ['TransactionId' => '…', 'PaymentMethod' => 'MBWAY']
+	 *  • 200 OK  → returns the body, e.g. ['TransactionId' => '…', 'PaymentMethod' => '...']
 	 *  • 404 Not Found → returns null (reference exists but payment NOT received yet)
 	 *  • other HTTP errors → re-throws RuntimeException
 	 *

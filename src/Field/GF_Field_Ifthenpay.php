@@ -146,7 +146,7 @@ class GF_Field_Ifthenpay extends \GF_Field {
 				<!-- Info -->
 				<div class="iftp-pbl-info">
 					<strong><?php esc_html_e( 'How it works:', 'ifthenpay-payments-for-gravityforms' ); ?></strong>
-					<ul>
+					<ul class="iftp-pbl-section-infos">
 						<li><?php esc_html_e( 'After submitting the form, you will be redirected to the secure ifthenpay payment page.', 'ifthenpay-payments-for-gravityforms' ); ?></li>
 						<li><?php esc_html_e( 'Pick your preferred payment method on that page and complete the payment.', 'ifthenpay-payments-for-gravityforms' ); ?></li>
 						<li><?php esc_html_e( 'ifthenpay only accepts EUR as the payment currency.', 'ifthenpay-payments-for-gravityforms' ); ?></li>

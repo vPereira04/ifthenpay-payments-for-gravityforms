@@ -170,7 +170,7 @@ class Addon extends \GFPaymentAddOn {
 				'version' => \IFTP_GF_VERSION,
 				'enqueue' => [
 					[ 'admin_page' => [ 'plugin_settings' ] ],
-					[ 'admin_page' => [ 'form_settings' ], 'tab' => $this->_slug ],
+					[ 'admin_page' => [ 'form_settings' ] ],
 				],
 			],
 			[
@@ -362,16 +362,6 @@ class Addon extends \GFPaymentAddOn {
 	 * to rebuild the methods table client-side when the gateway dropdown
 	 * changes — zero extra API hits, the page-load fetches are the entirety
 	 * of the data we need.
-	 *
-	 * Shape:
-	 *   {
-	 *     methods: [
-	 *       { entity: 'MBWAY', label: 'MBWAY', img_url: '…', allow_default: true }
-	 *     ],
-	 *     gatewayAccounts: { 'XXX-123456': { MBWAY: 'MBWAY-1234', CCARD: 'CCARD-5' }, ... },
-	 *     strings: { selectGateway, noMethods, notActivated, requestActivation,
-	 *                provisioned, autoMethod }
-	 *   }
 	 */
 	private function inject_feed_settings_client_data(): void {
 		static $injected = false;
@@ -449,8 +439,6 @@ class Addon extends \GFPaymentAddOn {
 	 * Builds the renderable list of payment methods for a given gateway key by
 	 * joining the fresh available-methods catalog (visible only) against the
 	 * gateway's row (which carries the per-method account values).
-	 *
-	 * Each row: [ 'entity' => 'MBWAY', 'label' => 'MBWAY', 'account' => 'MBWAY-1234', 'image_url' => '…' ]
 	 *
 	 * @return array<int, array<string, string>>
 	 */
@@ -772,20 +760,6 @@ class Addon extends \GFPaymentAddOn {
 
 	/**
 	 * Builds and persists the per-form payment snapshot.
-	 *
-	 * Schema (the single source of truth read by both the frontend field and
-	 * `redirect_url()` — no global catalog reads anywhere downstream):
-	 *
-	 *   {
-	 *     "gateway_key":        "XXX-123456",
-	 *     "default_method": "MBWAY",
-	 *     "pay_description":    "Order from My Store",
-	 *     "pay_methods": [
-	 *       { "entity": "MBWAY",   "account": "MBWAY-1234",   "is_active": true,  "img_url": "…" },
-	 *       { "entity": "PAYSHOP", "account": "PAYSHOP-1234", "is_active": false, "img_url": "…" }
-	 *     ]
-	 *   }
-	 *
 	 * Option key: `ifthenpay_gf_form_{$form_id}`.
 	 */
 	public function sync_form_payment_info( int $form_id, array $settings ): void {
@@ -1223,7 +1197,7 @@ class Addon extends \GFPaymentAddOn {
 	// Server-to-server webhook handler (MemberPress pattern)
 	//
 	// Trigger param: ?iftp_gf_callback=1
-	// SUCCESS payload:  ?iftp_gf_callback=1&ref={entry_id}&apk={base64(gateway_key)}&val={amount}&mtd={MB|MBWAY|...}&req={request_id}
+	// SUCCESS payload:  ?iftp_gf_callback=1&ref={entry_id}&apk={base64(gateway_key)}&val={amount}&mtd={...}&req={request_id}
 	// FAILURE payload:  ?iftp_gf_callback=1&ref={entry_id}&status={cancelled|error}
 	//
 	// Validates the call against entry meta written by redirect_url() and only
@@ -1385,26 +1359,18 @@ class Addon extends \GFPaymentAddOn {
 		$flash = '';
 
 		if ( $status === 'success' ) {
-			$tx = (string) ( $context['transaction_id'] ?? '' );
+			$tx = (string) ( $return_data['transaction_id'] ?? '' );
 
-			// Authoritative payment confirmation: the success redirect alone is not
-			// reliable for asynchronous methods (Multibanco/Payshop generate a
-			// reference and redirect back without the payment being received yet).
-			// /gateway/transaction/status/get returns 200 only when the payment has
-			// actually been received by ifthenpay; 404 means "reference exists but
-			// not paid". We only call complete_payment() on a true 200.
 			$verified = null;
 			if ( $tx !== '' ) {
 				try {
 					$verified = IfthenpayClient::verify_transaction_paid( $tx );
 				} catch ( \RuntimeException $e ) {
 					error_log( sprintf( '[ifthenpay-gf] verify_transaction_paid() error for entry #%d tx=%s: %s', $entry_id, $tx, $e->getMessage() ) );
-					$verified = null;
 				}
 			}
 
 			if ( is_array( $verified ) ) {
-				// Trust the API's PaymentMethod over the (often empty) URL param.
 				$api_method = (string) ( $verified['PaymentMethod'] ?? $verified['paymentMethod'] ?? '' );
 				$method     = $api_method !== '' ? $api_method : (string) ( $context['payment_method'] ?? '' );
 
@@ -1419,20 +1385,14 @@ class Addon extends \GFPaymentAddOn {
 				gform_update_meta( $entry_id, 'iftp_gf_payment_status', 'paid' );
 				$flash = 'paid';
 			} else {
-				// 404 from the API — payment reference exists but not yet paid.
-				// Common with Multibanco/Payshop. Leave the entry in Processing and
-				// add a note so the merchant knows we're awaiting the webhook.
-				$this->add_note(
-					$entry_id,
-					sprintf(
-						/* translators: %s: transaction id */
-						esc_html__( 'Customer returned from the ifthenpay gateway but payment is not yet received or failed (transaction %s). Awaiting webhook callback.', 'ifthenpay-payments-for-gravityforms' ),
-						$tx !== '' ? $tx : '—'
-					),
-					''
-				);
-				gform_update_meta( $entry_id, 'iftp_gf_payment_status', 'pending_verification' );
-				$flash = 'pending';
+				// No transaction_id on callback URL, or verify_transaction_paid returned 404 — payment failed.
+				$this->fail_payment( $entry, [
+					'transaction_id' => $tx,
+					'amount'         => $amount,
+					'type'           => 'fail_payment',
+				] );
+				gform_update_meta( $entry_id, 'iftp_gf_payment_status', 'failed' );
+				$flash = 'failed';
 			}
 		} elseif ( in_array( $status, [ 'cancel', 'cancelled', 'canceled' ], true ) ) {
 			\GFAPI::update_entry_property( $entry_id, 'payment_status', 'Cancelled' );
