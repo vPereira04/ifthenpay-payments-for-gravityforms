@@ -231,8 +231,9 @@ select option:disabled {
    Icons
    ------------------------------------------------------------------------- */
 
-.gform-icon--ifthenpay::before{
+.gform-icon.gform-icon--ifthenpay::before{
     content: "";
+    font-family: initial;
     display: inline-block;
     width: 24px;
     height: 23px;

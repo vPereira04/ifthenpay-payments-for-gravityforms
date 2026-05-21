@@ -6,7 +6,7 @@
 	box-sizing: border-box;
 }
 
-.iftp-pbl-gf-field {
+.iftp-gf-f-field {
 	margin: 0;
 	font-family: inherit;
 }
@@ -20,7 +20,7 @@
  * --gf-ctrl-size, not padding-y, so reusing it would flatten our card).
  * Each fallback matches the legacy 2.5 theme look.
  */
-.iftp-pbl-public-box {
+.iftp-gf-public-box {
 	max-width: 100%;
 	background: var(--gf-ctrl-bg-color, #fff);
 	color: var(--gf-ctrl-color, var(--gf-color-out-ctrl-dark-darker, #112337));
@@ -37,13 +37,13 @@
 }
 
 /* ---- Header (logo + title) ---- */
-.iftp-pbl-header {
+.iftp-gf-header {
 	display: flex;
 	align-items: center;
 	margin-bottom: 12px;
 }
 
-.iftp-pbl-header-icon {
+.iftp-gf-header-icon {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -53,48 +53,48 @@
 	flex-shrink: 0;
 }
 
-.iftp-pbl-header-text {
+.iftp-gf-header-text {
 	margin-left: 10px;
 	line-height: 1.2;
 }
 
-.iftp-pbl-header-title {
+.iftp-gf-header-title {
 	font-weight: 600;
-	color: var(--gf-ctrl-label-color-primary);
+	color: var(--gf-ctrl-label-color-quaternary, #112337);
 	font-size: var(--gf-font-size-secondary, 14px);
 }
 
-.iftp-pbl-header-subtitle {
+.iftp-gf-header-subtitle {
 	font-size: var(--gf-font-size-tertiary, 13px);
 	color: var(--gf-color-out-ctrl-dark-darker, #585e6a);
 	margin-top: 2px;
 }
 
 /* ---- Methods row ---- */
-.iftp-pbl-methods-section {
+.iftp-gf-methods-section {
 	padding: 8px 0 4px;
 }
 
-.iftp-pbl-methods-title {
+.iftp-gf-methods-title {
 	font-size: var(--gf-font-size-tertiary, 13px);
 	font-weight: 600;
-	color: var(--gf-ctrl-label-color-primary);
+	color: var(--gf-ctrl-label-color-quaternary, #112337);
 	margin-bottom: 10px;
 }
 
-.iftp-pbl-preview-methods {
+.iftp-gf-preview-methods {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 10px;
 }
 
-.iftp-pbl-method-item {
+.iftp-gf-method-item {
 	display: flex;
 	align-items: center;
 	justify-content: center;
 }
 
-.iftp-pbl-logo {
+.iftp-gf-logo {
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -105,11 +105,15 @@
 	transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.iftp-pbl-method-item[data-entity="CCARD"] .iftp-pbl-logo {
+.iftp-gf-method-item[data-entity="CCARD"] .iftp-gf-logo {
 	width: 90px;
 }
 
-.iftp-pbl-logo img {
+.iftp-gf-logo picture {
+	display: contents;
+}
+
+.iftp-gf-logo img {
 	max-width: 100%;
 	max-height: 100%;
 	object-fit: contain;
@@ -117,37 +121,37 @@
 }
 
 /* ---- Info block (subtle inset using the form's outer-surface light tint) ---- */
-.iftp-pbl-info {
+.iftp-gf-info {
 	margin-top: 12px;
 	padding: 10px 12px;
 	border-radius: var(--gf-radius, 3px);
 	font-size: var(--gf-font-size-tertiary, 13px);
-	color: var(--gf-color-out-ctrl-dark, #585e6a);
+	color: var(--gf-ctrl-label-color-quaternary, #112337);
 }
 
-.iftp-pbl-info strong {
-	color: var(--gf-ctrl-label-color-primary, #112337);
+.iftp-gf-info strong {
+	color: var(--gf-ctrl-label-color-quaternary, #112337);
 }
 
-.iftp-pbl-info ul {
+.iftp-gf-info ul {
 	margin: 6px 0 0;
 	padding-left: 18px;
 }
 
-.iftp-pbl-info ul li + li {
+.iftp-gf-info ul li + li {
 	margin-top: 2px;
 }
 
-.iftp-pbl-section-infos {
+.iftp-gf-section-infos {
   color: var(--gf-color-out-ctrl-dark-darker, #585e6a)
 }
 
 /* ---- Pay button (uses GF orbital token variables) ---- */
-.iftp-pbl-pay-row {
+.iftp-gf-pay-row {
 	margin-top: 18px;
 }
 
-.iftp-pbl-pay-now-button {
+.iftp-gf-pay-now-button {
 	appearance: none;
 	display: inline-flex;
 	align-items: center;
@@ -165,48 +169,48 @@
 	transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
-.iftp-pbl-pay-now-button:disabled {
+.iftp-gf-pay-now-button:disabled {
 	opacity: 0.55;
 	cursor: not-allowed;
 }
 
-.iftp-pbl-pay-now-button:hover:not(:disabled) {
+.iftp-gf-pay-now-button:hover:not(:disabled) {
 	background: var(--gf-color-primary-darker, #001AB3);
 	border-color: var(--gf-color-primary-darker, #001AB3);
 }
 
-.iftp-pbl-pay-now-button.is-paid {
+.iftp-gf-pay-now-button.is-paid {
 	background: #198754;
 	border-color: #198754;
 }
 
-.iftp-pbl-pay-now-button.is-paid:hover {
+.iftp-gf-pay-now-button.is-paid:hover {
 	background: #157347;
 	border-color: #157347;
 }
 
 /* ---- Spinner ---- */
-.iftp-pbl-spinner {
+.iftp-gf-spinner {
 	width: 14px;
 	height: 14px;
 	border: 2px solid rgb(255 255 255 / 40%);
 	border-top-color: #fff;
 	border-radius: 50%;
-	animation: iftp-pbl-spin 0.7s linear infinite;
+	animation: iftp-gf-spin 0.7s linear infinite;
 	display: none;
 	flex-shrink: 0;
 }
 
-.iftp-pbl-pay-now-button.is-loading .iftp-pbl-spinner {
+.iftp-gf-pay-now-button.is-loading .iftp-gf-spinner {
 	display: inline-block;
 }
 
-@keyframes iftp-pbl-spin {
+@keyframes iftp-gf-spin {
 	to { transform: rotate(360deg); }
 }
 
 /* ---- Status messages ---- */
-.iftp-pbl-status {
+.iftp-gf-status {
 	margin-top: 12px;
 	padding: 10px 12px;
 	border-radius: var(--gf-radius, 3px);
@@ -214,12 +218,12 @@
 	display: none;
 }
 
-.iftp-pbl-status.is-visible { display: block; }
-.iftp-pbl-status.is-success { color: #1b5e20; }
-.iftp-pbl-status.is-error   { background: #fdecea;}
-.iftp-pbl-status.is-info    { border: 1px solid #90caf9; }
+.iftp-gf-status.is-visible { display: block; }
+.iftp-gf-status.is-success { color: #1b5e20; }
+.iftp-gf-status.is-error   { background: #fdecea;}
+.iftp-gf-status.is-info    { border: 1px solid #90caf9; }
 
-.iftp-pbl-runtime-warning {
+.iftp-gf-runtime-warning {
 	margin-top: 10px;
 	padding: 10px 12px;
 	border-radius: var(--gf-radius, 3px);
@@ -232,8 +236,8 @@
 
 /* ---- Responsive ---- */
 @media (width <= 600px) {
-	.iftp-pbl-public-box     { padding: 12px; }
-	.iftp-pbl-pay-now-button { width: 100%; }
+	.iftp-gf-public-box     { padding: 12px; }
+	.iftp-gf-pay-now-button { width: 100%; }
 }
 
 /* -------------------------------------------------------------------------

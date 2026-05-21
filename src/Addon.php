@@ -88,8 +88,8 @@ class Addon extends \GFPaymentAddOn {
 	}
 
 	/**
-	 * Loads the field stylesheet into the Gutenberg block-editor iframe so the
-	 * GF form-block preview matches the front-end look.
+	 * Loads the field stylesheet and dark-logo script into the Gutenberg
+	 * block-editor iframe so the GF form-block preview matches the front-end look.
 	 */
 	public function enqueue_block_editor_styles(): void {
 		wp_enqueue_style(
@@ -97,6 +97,13 @@ class Addon extends \GFPaymentAddOn {
 			\IFTP_GF_URL . 'assets/css/frontend.css',
 			[],
 			\IFTP_GF_VERSION
+		);
+		wp_enqueue_script(
+			'ifthenpay_gf_frontend',
+			\IFTP_GF_URL . 'assets/js/frontend.js',
+			[],
+			\IFTP_GF_VERSION,
+			true
 		);
 	}
 
@@ -113,6 +120,15 @@ class Addon extends \GFPaymentAddOn {
 
 	public function scripts(): array {
 		$scripts = [
+			[
+				'handle'  => 'ifthenpay_gf_frontend',
+				'src'     => \IFTP_GF_URL . 'assets/js/frontend.js',
+				'version' => \IFTP_GF_VERSION,
+				'deps'    => [],
+				'enqueue' => [
+					[ 'field_types' => [ 'iftp_pbl' ] ],
+				],
+			],
 			[
 				'handle'  => 'ifthenpay_gf_admin',
 				'src'     => \IFTP_GF_URL . 'assets/js/admin.js',
@@ -150,6 +166,7 @@ class Addon extends \GFPaymentAddOn {
 				'enqueue' => [
 					[ 'admin_page' => [ 'plugin_settings' ] ],
 					[ 'admin_page' => [ 'form_settings' ] ],
+					[ 'admin_page' => [ 'form_editor' ] ],
 				],
 			],
 			[
@@ -344,12 +361,14 @@ class Addon extends \GFPaymentAddOn {
 
 		$methods = [];
 		foreach ( $visible as $entity => $cat_entry ) {
-			$small_url = (string) ( $cat_entry['small_image_url'] ?? '' );
-			$full_url  = (string) ( $cat_entry['image_url'] ?? '' );
+			$small_url      = (string) ( $cat_entry['small_image_url'] ?? '' );
+			$full_url       = (string) ( $cat_entry['image_url'] ?? '' );
+			$small_dark_url = (string) ( $cat_entry['small_image_url_dark'] ?? '' );
 			$methods[] = [
 				'entity'        => $entity,
 				'label'         => (string) ( $cat_entry['label'] ?? $entity ),
 				'img_url'       => $small_url !== '' ? $small_url : ( $full_url !== '' ? $full_url : 'https://gateway.ifthenpay.com/plugins/logotipos/small/' . strtolower( $entity ) . '.png' ),
+				'img_url_dark'  => $small_dark_url,
 				'allow_default' => (bool) ( $cat_entry['allow_selected_method'] ?? true ),
 			];
 		}
@@ -425,14 +444,15 @@ class Addon extends \GFPaymentAddOn {
 		$rows = [];
 		foreach ( $this->fetch_visible_methods_keyed() as $entity => $cat_entry ) {
 			$rows[] = [
-				'entity'    => $entity,
-				'label'     => (string) ( $cat_entry['label'] ?? $entity ),
+				'entity'         => $entity,
+				'label'          => (string) ( $cat_entry['label'] ?? $entity ),
 
-				'account'   => $this->resolve_account_in_row( $row, $entity, (string) ( $cat_entry['label'] ?? '' ) ),
+				'account'        => $this->resolve_account_in_row( $row, $entity, (string) ( $cat_entry['label'] ?? '' ) ),
 
-				'image_url' => (string) ( $cat_entry['small_image_url'] ?? $cat_entry['image_url'] ?? '' ),
+				'image_url'      => (string) ( $cat_entry['small_image_url'] ?? $cat_entry['image_url'] ?? '' ),
+				'image_url_dark' => (string) ( $cat_entry['small_image_url_dark'] ?? '' ),
 
-				'position'  => (int) ( $cat_entry['position'] ?? 0 ),
+				'position'       => (int) ( $cat_entry['position'] ?? 0 ),
 			];
 		}
 
@@ -759,11 +779,12 @@ class Addon extends \GFPaymentAddOn {
 			$entity        = $row['entity'];
 			$is_active     = ! empty( $methods_config[ $entity ]['enabled'] );
 			$pay_methods[] = [
-				'entity'    => $entity,
-				'account'   => $row['account'],
-				'is_active' => $is_active,
-				'position'	=> $position,
-				'img_url'   => $row['image_url'],
+				'entity'       => $entity,
+				'account'      => $row['account'],
+				'is_active'    => $is_active,
+				'position'     => $position,
+				'img_url'      => $row['image_url'],
+				'img_url_dark' => (string) ( $row['image_url_dark'] ?? '' ),
 			];
 		}
 
@@ -1604,6 +1625,7 @@ class Addon extends \GFPaymentAddOn {
 				'label'                 => (string) ( $method['Method'] ?? $entity ),
 				'image_url'             => (string) ( $method['ImageUrl'] ?? '' ),
 				'small_image_url'       => (string) ( $method['SmallImageUrl'] ?? '' ),
+				'small_image_url_dark'  => (string) ( $method['SmallImageUrlDark'] ?? '' ),
 				'position'              => (int) ( $method['Position'] ?? 0 ),
 				'allow_selected_method' => (bool) ( $method['AllowSelectedMethod'] ?? true ),
 			];
