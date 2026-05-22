@@ -212,60 +212,6 @@
 
 
 
-	$(document).on(
-		'change',
-		'select[name="_gform_setting_gateway_key"]',
-		function () {
-			const newKey = $(this).val() || '';
-			const $wrapper = $('#iftp-gf-methods-table-wrapper');
-			const $defaultSelect = $('[name="_gform_setting_default_method"]');
-			if (!$wrapper.length) {
-				return;
-			}
-
-			$wrapper.html(
-				'<p class="iftp-gf-loading">' +
-					(strings.methods_loading || 'Loading...') +
-					'</p>'
-			);
-
-			$.post(
-				ajaxUrl,
-				{
-					action: 'iftp_gf_get_methods_table',
-					nonce: nonce,
-					gateway_key: newKey,
-				},
-				null,
-				'json'
-			)
-				.done(function (res) {
-					if (res && res.success) {
-						$wrapper.html(res.data.table_html);
-						if ($defaultSelect.length) {
-							$defaultSelect.html(res.data.default_options);
-						}
-						syncDefaultMethodDropdown();
-					} else {
-						$wrapper.html(
-							'<p class="iftp-gf-no-methods">' +
-								(strings.generic_error || 'Error loading methods.') +
-								'</p>'
-						);
-					}
-				})
-				.fail(function () {
-					$wrapper.html(
-						'<p class="iftp-gf-no-methods">' +
-							(strings.generic_error || 'Error loading methods.') +
-							'</p>'
-					);
-				});
-		}
-	);
-
-
-
 	$(document).on('click', '.iftp-gf-method-item__activate-btn', function (e) {
 		e.preventDefault();
 
@@ -313,6 +259,69 @@
 				);
 			});
 	});
+
+
+
+	function loadMethodsTable(gatewayKey) {
+		const $wrapper = $('#iftp-gf-methods-table-wrapper');
+		const $defaultSelect = $('[name="_gform_setting_default_method"]');
+
+		$wrapper.html(
+			'<p class="iftp-gf-loading">' +
+				(strings.methods_loading || 'Loading payment methods…') +
+				'</p>'
+		);
+
+		$.post(
+			ajaxUrl,
+			{
+				action: 'iftp_gf_get_methods_table',
+				nonce: connectionNonce(),
+				gateway_key: gatewayKey,
+			},
+			null,
+			'json'
+		)
+			.done(function (res) {
+				if (res && res.success) {
+					$wrapper.html(res.data.table_html || '');
+					if ($defaultSelect.length && res.data.default_options) {
+						const current = $defaultSelect.val();
+						$defaultSelect.html(res.data.default_options);
+						if (
+							$defaultSelect
+								.find('option[value="' + current + '"]')
+								.length
+						) {
+							$defaultSelect.val(current);
+						}
+					}
+					syncDefaultMethodDropdown();
+				} else {
+					$wrapper.html(
+						'<p class="iftp-gf-error">' +
+							((res && res.data && res.data.message) ||
+								(strings.generic_error || 'Request failed.')) +
+							'</p>'
+					);
+				}
+			})
+			.fail(function () {
+				$wrapper.html(
+					'<p class="iftp-gf-error">' +
+						(strings.generic_error || 'Request failed.') +
+						'</p>'
+				);
+			});
+	}
+
+	$(document).on(
+		'change',
+		'select[name="_gform_setting_gateway_key"]',
+		function () {
+			loadMethodsTable($(this).val() || '');
+		}
+	);
 
 
 

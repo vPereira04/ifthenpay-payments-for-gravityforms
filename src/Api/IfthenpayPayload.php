@@ -95,5 +95,13 @@ final class IfthenpayPayload {
 			: sprintf( 'Order #%s', $id );
 	}
 
+	/**
+	 * Returns the CDN fallback logo URL for a payment method entity.
+	 * Used when the API-provided image_url is absent.
+	 */
+	public static function fallback_logo_url( string $entity ): string {
+		return 'https://gateway.ifthenpay.com/plugins/logotipos/small/' . strtolower( $entity ) . '.png';
+	}
+
 	private function __construct() {}
 }

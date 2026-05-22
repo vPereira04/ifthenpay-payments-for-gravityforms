@@ -9,6 +9,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 use Ifthenpay\GravityForms\Addon;
+use Ifthenpay\GravityForms\Api\IfthenpayPayload;
+use Ifthenpay\GravityForms\Repository\FormPaymentInfo;
 
 class GF_Field_Ifthenpay extends \GF_Field {
 
@@ -67,7 +69,7 @@ class GF_Field_Ifthenpay extends \GF_Field {
 		}
 
 		$form_id   = (int) rgar( $form, 'id' );
-		$form_info = Addon::get_form_payment_info( $form_id );
+		$form_info = FormPaymentInfo::get( $form_id );
 
 		$default_method = strtoupper( (string) ( $form_info['default_method'] ?? '' ) );
 		$active_methods = array_values( array_filter(
@@ -129,7 +131,7 @@ class GF_Field_Ifthenpay extends \GF_Field {
 							$is_default    = ( $entity_key === $default_method );
 							$logo_url      = (string) ( $method['img_url'] ?? '' );
 							if ( $logo_url === '' ) {
-								$logo_url = 'https://gateway.ifthenpay.com/plugins/logotipos/small/' . strtolower( $entity_key ) . '.png';
+								$logo_url = IfthenpayPayload::fallback_logo_url( $entity_key );
 							}
 							$logo_url_dark = (string) ( $method['img_url_dark'] ?? '' );
 							$method_label  = $entity_key;

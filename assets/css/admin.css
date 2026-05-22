@@ -93,8 +93,12 @@
 }
 
 .iftp-gf-method-item--enabled {
-    border-color: #2271b1;
-    background: #f0f6fc;
+    border-color: #68b3f0;
+    background: #f4faff;
+}
+
+.iftp-gf-method-item--enabled:hover {
+    border-color: #114774;
 }
 
 /* IsVisible=false from the API — label locked out, activate button remains interactive */
@@ -135,7 +139,7 @@ select option:disabled {
     min-width: 0;
 }
 
-.iftp-gf-method-item__label input[type="checkbox"] {
+.iftp-gf-method-item__toggle {
     margin: 0;
     flex-shrink: 0;
 }
@@ -246,7 +250,7 @@ select option:disabled {
 }
 
 
-.ifthenpay-small-icon {
+.iftp-gf-icon--small {
     display: inline-block;
     width: 34px;
     height: 34px;

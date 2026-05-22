@@ -10,15 +10,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 use Ifthenpay\GravityForms\Api\GFFormData;
 use Ifthenpay\GravityForms\Api\IfthenpayClient;
-use Ifthenpay\GravityForms\Api\IfthenpayEmailHelper;
 use Ifthenpay\GravityForms\Api\IfthenpayPayload;
 use Ifthenpay\GravityForms\Api\IfthenpayReturn;
+use Ifthenpay\GravityForms\Mail\IfthenpayEmailHelper;
+use Ifthenpay\GravityForms\Repository\FormPaymentInfo;
 
 require_once \IFTP_GF_DIR . 'src/Api/IfthenpayClient.php';
 require_once \IFTP_GF_DIR . 'src/Api/IfthenpayPayload.php';
 require_once \IFTP_GF_DIR . 'src/Api/IfthenpayReturn.php';
-require_once \IFTP_GF_DIR . 'src/Api/IfthenpayEmailHelper.php';
 require_once \IFTP_GF_DIR . 'src/Api/GFFormData.php';
+require_once \IFTP_GF_DIR . 'src/Mail/IfthenpayEmailHelper.php';
+require_once \IFTP_GF_DIR . 'src/Repository/FormPaymentInfo.php';
 require_once \IFTP_GF_DIR . 'src/Field/GF_Field_Ifthenpay.php';
 
 class Addon extends \GFPaymentAddOn {
@@ -38,9 +40,6 @@ class Addon extends \GFPaymentAddOn {
 	private static ?self $_instance = null;
 
 	private const OPTION_BACKOFFICE_KEY = 'iftp_gf_backofficekey';
-
-	/** WP option prefix for the per-form payment snapshot (suffix = form ID). */
-	private const OPTION_FORM_INFO_PREFIX = 'ifthenpay_gf_form_';
 
 	/** Restrict gateway-key listings to the "GravityForms" type only. */
 	private const GATEWAY_TYPE = 'GravityForms';
@@ -118,8 +117,8 @@ class Addon extends \GFPaymentAddOn {
 
 		add_action( 'wp_ajax_iftp_gf_connect_backoffice',    [ $this, 'ajax_connect_backoffice' ] );
 		add_action( 'wp_ajax_iftp_gf_disconnect_backoffice', [ $this, 'ajax_disconnect_backoffice' ] );
-		add_action( 'wp_ajax_iftp_gf_get_methods_table',     [ $this, 'ajax_get_methods_table' ] );
 		add_action( 'wp_ajax_iftp_gf_activate_method',       [ $this, 'ajax_activate_payment_method' ] );
+		add_action( 'wp_ajax_iftp_gf_get_methods_table',     [ $this, 'ajax_get_methods_table' ] );
 	}
 
 
@@ -151,8 +150,8 @@ class Addon extends \GFPaymentAddOn {
 					'activation_button'   => __( 'Request Activation', 'ifthenpay-payments-for-gravityforms' ),
 					'activation_sending'  => __( 'Sending...', 'ifthenpay-payments-for-gravityforms' ),
 					'activation_sent'     => __( 'Activation request sent.', 'ifthenpay-payments-for-gravityforms' ),
-					'activation_cooldown' => __( 'Request already sent. Please wait 24 hours.', 'ifthenpay-payments-for-gravityforms' ),
-					'methods_loading'     => __( 'Loading payment methods…', 'ifthenpay-payments-for-gravityforms' ),
+					'activation_cooldown'  => __( 'Request already sent. Please wait 24 hours.', 'ifthenpay-payments-for-gravityforms' ),
+					'methods_loading'      => __( 'Loading payment methods…', 'ifthenpay-payments-for-gravityforms' ),
 				],
 				'enqueue' => [
 					[ 'admin_page' => [ 'plugin_settings' ] ],
@@ -239,17 +238,7 @@ class Addon extends \GFPaymentAddOn {
 			</button>
 		</div>
 
-		<div id="iftp-gf-connection-status-card">
-			<?php if ( $is_connected ) : ?>
-			<div class="alert gforms_note_success">
-				<h4><?php esc_html_e( 'Connected', 'ifthenpay-payments-for-gravityforms' ); ?></h4>
-				<p><?php esc_html_e( 'Your Backoffice Key is connected. Open any form\'s Settings → ifthenpay to configure gateway keys and payment methods.', 'ifthenpay-payments-for-gravityforms' ); ?></p>
-				<button type="button" id="iftp-gf-disconnect-backoffice" class="button button-secondary">
-					<?php esc_html_e( 'Disconnect', 'ifthenpay-payments-for-gravityforms' ); ?>
-				</button>
-			</div>
-			<?php endif; ?>
-		</div>
+		<?php echo $this->render_connection_card_html(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- sanitized inside render_connection_card_html() ?>
 
 		<p><span class="iftp-gf-message" aria-live="polite"></span></p>
 
@@ -284,7 +273,7 @@ class Addon extends \GFPaymentAddOn {
 						'label'   => __( 'Gateway Key', 'ifthenpay-payments-for-gravityforms' ),
 						'type'    => 'select',
 						'name'    => 'gateway_key',
-						'tooltip' => __( 'Select the ifthenpay gateway key for this form. The payment methods table updates automatically when you change the selection — no need to save first.', 'ifthenpay-payments-for-gravityforms' ),
+						'tooltip' => __( 'Select the ifthenpay gateway key for this form. The payment methods table updates automatically when you change the selection.', 'ifthenpay-payments-for-gravityforms' ),
 						'choices' => $this->get_gateway_key_choices(),
 					],
 					[
@@ -317,25 +306,15 @@ class Addon extends \GFPaymentAddOn {
 	 * Custom settings field renderer for the payment methods list (feed settings page).
 	 */
 	public function settings_iftp_gf_methods_table( mixed $_field, bool $echo = true ): string {
-		$gateway_key = (string) ( $this->get_setting( 'gateway_key' ) ?? '' );
-
-		$methods        = $this->build_method_rows_for_gateway( $gateway_key );
+		$gateway_key    = (string) ( $this->get_setting( 'gateway_key' ) ?? '' );
 		$methods_config = $this->read_methods_config_from_active_feed();
 
 		ob_start();
 		?>
 		<div id="iftp-gf-methods-table-wrapper">
-			<?php if ( $gateway_key === '' ) : ?>
-				<p class="iftp-gf-no-methods">
-					<?php esc_html_e( 'Select a gateway key above to load available payment methods.', 'ifthenpay-payments-for-gravityforms' ); ?>
-				</p>
-			<?php elseif ( empty( $methods ) ) : ?>
-				<p class="iftp-gf-no-methods">
-					<?php esc_html_e( 'No payment methods are provisioned on this gateway.', 'ifthenpay-payments-for-gravityforms' ); ?>
-				</p>
-			<?php else : ?>
-				<?php $this->render_methods_list( $methods, $methods_config ); ?>
-			<?php endif; ?>
+			<?php
+			echo $this->render_methods_table_inner( $gateway_key, $methods_config ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- kses-sanitized below
+			?>
 		</div>
 		<?php
 		$html = (string) ob_get_clean();
@@ -346,6 +325,28 @@ class Addon extends \GFPaymentAddOn {
 		}
 
 		return $html;
+	}
+
+	/**
+	 * Inner content of the methods table — without the #iftp-gf-methods-table-wrapper div.
+	 * Used by both the page-render path (settings_iftp_gf_methods_table) and the
+	 * AJAX gateway-key change handler (ajax_get_methods_table) so the markup is
+	 * defined once and cannot drift.
+	 *
+	 * @param array<string, array<string, mixed>> $methods_config Previously-saved checkbox state.
+	 */
+	private function render_methods_table_inner( string $gateway_key, array $methods_config ): string {
+		$methods = $this->build_method_rows_for_gateway( $gateway_key );
+
+		ob_start();
+		if ( $gateway_key === '' ) {
+			echo '<p class="iftp-gf-no-methods">' . esc_html__( 'Select a gateway key above to load available payment methods.', 'ifthenpay-payments-for-gravityforms' ) . '</p>';
+		} elseif ( empty( $methods ) ) {
+			echo '<p class="iftp-gf-no-methods">' . esc_html__( 'No payment methods are provisioned on this gateway.', 'ifthenpay-payments-for-gravityforms' ) . '</p>';
+		} else {
+			$this->render_methods_list( $methods, $methods_config );
+		}
+		return (string) ob_get_clean();
 	}
 
 	/**
@@ -417,7 +418,7 @@ class Addon extends \GFPaymentAddOn {
 				$is_provisioned = ( $account !== '' );
 				$logo_url      = $method['image_url'] !== ''
 					? $method['image_url']
-					: 'https://gateway.ifthenpay.com/plugins/logotipos/small/' . strtolower( $entity_key ) . '.png';
+					: IfthenpayPayload::fallback_logo_url( $entity_key );
 
 				$is_enabled    = $is_provisioned && ! empty( $methods_config[ $entity_key ]['enabled'] );
 				$is_wide_logo  = $entity_key === 'CCARD';
@@ -698,7 +699,7 @@ class Addon extends \GFPaymentAddOn {
 	public function sync_form_payment_info( int $form_id, array $settings ): void {
 		$gateway_key = (string) ( $settings['gateway_key'] ?? '' );
 		if ( $gateway_key === '' ) {
-			delete_option( self::OPTION_FORM_INFO_PREFIX . $form_id );
+			FormPaymentInfo::delete( $form_id );
 			return;
 		}
 
@@ -728,15 +729,14 @@ class Addon extends \GFPaymentAddOn {
 			];
 		}
 
-		update_option(
-			self::OPTION_FORM_INFO_PREFIX . $form_id,
+		FormPaymentInfo::save(
+			$form_id,
 			[
-				'gateway_key'        => $gateway_key,
-				'default_method' => strtoupper( (string) ( $settings['default_method'] ?? '' ) ),
-				'pay_description'    => sanitize_text_field( (string) ( $settings['description'] ?? '' ) ),
-				'pay_methods'        => $pay_methods,
-			],
-			false
+				'gateway_key'     => $gateway_key,
+				'default_method'  => strtoupper( (string) ( $settings['default_method'] ?? '' ) ),
+				'pay_description' => sanitize_text_field( (string) ( $settings['description'] ?? '' ) ),
+				'pay_methods'     => $pay_methods,
+			]
 		);
 	}
 
@@ -746,8 +746,7 @@ class Addon extends \GFPaymentAddOn {
 	 * runs, so if it's missing it means the admin has never saved the feed.
 	 */
 	public static function get_form_payment_info( int $form_id ): array {
-		$data = get_option( self::OPTION_FORM_INFO_PREFIX . $form_id, [] );
-		return is_array( $data ) ? $data : [];
+		return FormPaymentInfo::get( $form_id );
 	}
 
 
@@ -1325,7 +1324,7 @@ class Addon extends \GFPaymentAddOn {
 			if ( $tx !== '' ) {
 				try {
 					$verified = IfthenpayClient::verify_transaction_paid( $tx );
-				} catch ( \RuntimeException $e ) {
+				} catch ( \RuntimeException ) {
 				}
 			}
 
@@ -1643,15 +1642,7 @@ class Addon extends \GFPaymentAddOn {
 		}
 
 		delete_option( self::OPTION_BACKOFFICE_KEY );
-
-
-		global $wpdb;
-		$wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$wpdb->prepare(
-				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
-				$wpdb->esc_like( self::OPTION_FORM_INFO_PREFIX ) . '%'
-			)
-		);
+		FormPaymentInfo::delete_all();
 
 		wp_send_json_success( [
 			'message'     => __( 'Backoffice Key disconnected.', 'ifthenpay-payments-for-gravityforms' ),
@@ -1670,18 +1661,7 @@ class Addon extends \GFPaymentAddOn {
 
 		$gateway_key = sanitize_text_field( wp_unslash( (string) ( $_POST['gateway_key'] ?? '' ) ) );
 
-
-		$methods = $gateway_key !== '' ? $this->build_method_rows_for_gateway( $gateway_key ) : [];
-
-		ob_start();
-		if ( $gateway_key === '' ) {
-			echo '<p class="iftp-gf-no-methods">' . esc_html__( 'Select a gateway key above to load available payment methods.', 'ifthenpay-payments-for-gravityforms' ) . '</p>';
-		} elseif ( empty( $methods ) ) {
-			echo '<p class="iftp-gf-no-methods">' . esc_html__( 'No payment methods are provisioned on this gateway.', 'ifthenpay-payments-for-gravityforms' ) . '</p>';
-		} else {
-			$this->render_methods_list( $methods, [] );
-		}
-		$table_html = (string) ob_get_clean();
+		$table_html = $this->render_methods_table_inner( $gateway_key, [] );
 
 
 		$default_options = '<option value="">' . esc_html__( '— Auto (first enabled method) —', 'ifthenpay-payments-for-gravityforms' ) . '</option>';
