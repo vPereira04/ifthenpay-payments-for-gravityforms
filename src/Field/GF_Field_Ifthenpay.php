@@ -104,26 +104,26 @@ class GF_Field_Ifthenpay extends \GF_Field {
 
 		ob_start();
 		?>
-		<div class="ginput_container iftp-gf-f-field iftp-gf-is-preview gform-theme__no-reset--children"
+		<div class="ginput_container iftp-gf-field iftp-gf-field--preview gform-theme__no-reset--children"
 			 data-form-id="<?php echo esc_attr( (string) $form_id ); ?>">
 
-			<div class="iftp-gf-public-box">
+			<div class="iftp-gf-box">
 
 				<!-- Header -->
-				<div class="iftp-gf-header">
-					<span class="iftp-gf-header-icon" aria-hidden="true">
+				<div class="iftp-gf-box__header">
+					<span class="iftp-gf-box__header-icon" aria-hidden="true">
 						<img src="<?php echo esc_url( \IFTP_GF_URL . 'assets/images/ifthenpay-field-icon.svg' ); ?>" alt="Ifthenpay" width="50" height="50">
 					</span>
-					<div class="iftp-gf-header-text">
-						<div class="iftp-gf-header-title">ifthenpay</div>
-						<div class="iftp-gf-header-subtitle"><?php esc_html_e( 'Payment Gateway', 'ifthenpay-payments-for-gravityforms' ); ?></div>
+					<div class="iftp-gf-box__header-text">
+						<div class="iftp-gf-box__header-title">ifthenpay</div>
+						<div class="iftp-gf-box__header-subtitle"><?php esc_html_e( 'Payment Gateway', 'ifthenpay-payments-for-gravityforms' ); ?></div>
 					</div>
 				</div>
 
 				<!-- Payment methods preview -->
-				<div class="iftp-gf-methods-section">
-					<div class="iftp-gf-methods-title"><?php esc_html_e( 'Payment methods:', 'ifthenpay-payments-for-gravityforms' ); ?></div>
-					<div class="iftp-gf-preview-methods">
+				<div class="iftp-gf-box__methods">
+					<div class="iftp-gf-box__methods-title"><?php esc_html_e( 'Payment methods:', 'ifthenpay-payments-for-gravityforms' ); ?></div>
+					<div class="iftp-gf-box__methods-list">
 						<?php foreach ( $active_methods as $method ) :
 							$entity_key    = strtoupper( (string) ( $method['entity'] ?? '' ) );
 							$is_default    = ( $entity_key === $default_method );
@@ -134,8 +134,8 @@ class GF_Field_Ifthenpay extends \GF_Field {
 							$logo_url_dark = (string) ( $method['img_url_dark'] ?? '' );
 							$method_label  = $entity_key;
 						?>
-						<span class="iftp-gf-method-item<?php echo $is_default ? ' is-default' : ''; ?>" data-entity="<?php echo esc_attr( $entity_key ); ?>">
-							<span class="iftp-gf-logo">
+						<span class="iftp-gf-box__method<?php echo $is_default ? ' iftp-gf-box__method--default' : ''; ?>" data-entity="<?php echo esc_attr( $entity_key ); ?>">
+							<span class="iftp-gf-box__method-logo">
 								<picture>
 									<?php if ( $logo_url_dark !== '' ) : ?>
 									<source media="(prefers-color-scheme: dark)" srcset="<?php echo esc_url( $logo_url_dark ); ?>">
@@ -151,9 +151,9 @@ class GF_Field_Ifthenpay extends \GF_Field {
 				</div>
 
 				<!-- Info -->
-				<div class="iftp-gf-info">
+				<div class="iftp-gf-box__info">
 					<strong><?php esc_html_e( 'How it works:', 'ifthenpay-payments-for-gravityforms' ); ?></strong>
-					<ul class="iftp-gf-section-infos">
+					<ul class="iftp-gf-box__info-list">
 						<li><?php esc_html_e( 'After submitting the form, you will be redirected to the secure ifthenpay payment page.', 'ifthenpay-payments-for-gravityforms' ); ?></li>
 						<li><?php esc_html_e( 'Pick your preferred payment method on that page and complete the payment.', 'ifthenpay-payments-for-gravityforms' ); ?></li>
 						<li><?php esc_html_e( 'ifthenpay only accepts EUR as the payment currency.', 'ifthenpay-payments-for-gravityforms' ); ?></li>
@@ -186,15 +186,15 @@ class GF_Field_Ifthenpay extends \GF_Field {
 	private function get_editor_preview(): string {
 		ob_start();
 		?>
-		<div class="ginput_container iftp-gf-f-field gform-theme__no-reset--children">
-			<div class="iftp-gf-public-box">
-				<div class="iftp-gf-header">
-					<span class="iftp-gf-header-icon" aria-hidden="true">
+		<div class="ginput_container iftp-gf-field gform-theme__no-reset--children">
+			<div class="iftp-gf-box">
+				<div class="iftp-gf-box__header">
+					<span class="iftp-gf-box__header-icon" aria-hidden="true">
 						<img src="<?php echo esc_url( \IFTP_GF_URL . 'assets/images/ifthenpay-field-icon.svg' ); ?>" alt="Ifthenpay" width="22" height="22">
 					</span>
-					<div class="iftp-gf-header-text">
-						<div class="iftp-gf-header-title">ifthenpay</div>
-						<div class="iftp-gf-header-subtitle"><?php esc_html_e( 'Payment Gateway', 'ifthenpay-payments-for-gravityforms' ); ?></div>
+					<div class="iftp-gf-box__header-text">
+						<div class="iftp-gf-box__header-title">ifthenpay</div>
+						<div class="iftp-gf-box__header-subtitle"><?php esc_html_e( 'Payment Gateway', 'ifthenpay-payments-for-gravityforms' ); ?></div>
 					</div>
 				</div>
 				<p style="color:#585e6a;font-size:13px;margin:8px 0 0;">

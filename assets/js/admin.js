@@ -26,9 +26,9 @@
 
 	function setMessage(msg, type) {
 		const $el = $('.iftp-gf-message').first();
-		$el.removeClass('is-success is-error').text(msg || '');
+		$el.removeClass('iftp-gf-message--success iftp-gf-message--error').text(msg || '');
 		if (type) {
-			$el.addClass('is-' + type);
+			$el.addClass('iftp-gf-message--' + type);
 		}
 	}
 
@@ -43,7 +43,7 @@
 	function syncKeyFieldVisibility() {
 		const isConnected = !!$('#iftp-gf-disconnect-backoffice').length;
 		$('.iftp-gf-key-row').toggleClass(
-			'iftp-gf-key-field-hidden',
+			'iftp-gf-key-row--hidden',
 			isConnected
 		);
 	}
@@ -176,7 +176,7 @@
 
 
 		const enabled = {};
-		$('#iftp-gf-methods-table-wrapper .iftp-gf-method-toggle').each(
+		$('#iftp-gf-methods-table-wrapper .iftp-gf-method-item__toggle').each(
 			function () {
 				const entity = ($(this).data('entity') || '').toUpperCase();
 				enabled[entity] = $(this).is(':checked');
@@ -206,7 +206,7 @@
 
 	$(document).on(
 		'change',
-		'#iftp-gf-methods-table-wrapper .iftp-gf-method-toggle',
+		'#iftp-gf-methods-table-wrapper .iftp-gf-method-item__toggle',
 		syncDefaultMethodDropdown
 	);
 
@@ -266,7 +266,7 @@
 
 
 
-	$(document).on('click', '.iftp-gf-activate-method', function (e) {
+	$(document).on('click', '.iftp-gf-method-item__activate-btn', function (e) {
 		e.preventDefault();
 
 		const $btn = $(this);
@@ -290,8 +290,8 @@
 		)
 			.done(function (res) {
 				if (res && res.success) {
-					$btn.closest('.iftp-gf-method-right').html(
-						'<em class="iftp-gf-activation-sent">' +
+					$btn.closest('.iftp-gf-method-item__right').html(
+						'<em class="iftp-gf-method-item__activation-sent">' +
 							(strings.activation_sent || 'Request sent.') +
 							'</em>'
 					);
@@ -300,8 +300,8 @@
 						(res && res.data && res.data.message) ||
 						strings.activation_cooldown ||
 						'Request already sent.';
-					$btn.closest('.iftp-gf-method-right').html(
-						'<em class="iftp-gf-activation-cooldown">' +
+					$btn.closest('.iftp-gf-method-item__right').html(
+						'<em class="iftp-gf-method-item__activation-cooldown">' +
 							msg +
 							'</em>'
 					);

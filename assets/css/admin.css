@@ -13,7 +13,7 @@
 }
 
 /* Specificity 0,2,0 beats .iftp-gf-key-row's display:flex (0,1,0) */
-.iftp-gf-key-row.iftp-gf-key-field-hidden {
+.iftp-gf-key-row--hidden {
     display: none;
 }
 
@@ -24,11 +24,11 @@
     line-height: 1.125rem;
 }
 
-.iftp-gf-message.is-success {
+.iftp-gf-message--success {
     color: #0a7227;
 }
 
-.iftp-gf-message.is-error {
+.iftp-gf-message--error {
     color: #8a0000;
 }
 
@@ -92,20 +92,23 @@
     border-color: #8c8f94;
 }
 
-.iftp-gf-method-item.is-enabled {
+.iftp-gf-method-item--enabled {
     border-color: #2271b1;
     background: #f0f6fc;
 }
 
-/* IsVisible=false from the API — shown but locked out */
-.iftp-gf-method-item.is-unavailable {
-    opacity: 0.55;
-    pointer-events: none;
+/* IsVisible=false from the API — label locked out, activate button remains interactive */
+.iftp-gf-method-item--unactivated {
     border-color: #dcdcde;
     background: #f6f7f7;
 }
 
-.iftp-gf-unavailable-badge {
+.iftp-gf-method-item--unactivated .iftp-gf-method-item__label {
+    opacity: 0.55;
+    pointer-events: none;
+}
+
+.iftp-gf-method-item__unavailable-badge {
     font-size: 10px;
     font-weight: 600;
     text-transform: uppercase;
@@ -123,7 +126,7 @@ select option:disabled {
     color: #a7aaad;
 }
 
-.iftp-gf-method-item-label {
+.iftp-gf-method-item__label {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -132,12 +135,12 @@ select option:disabled {
     min-width: 0;
 }
 
-.iftp-gf-method-item-label input[type="checkbox"] {
+.iftp-gf-method-item__label input[type="checkbox"] {
     margin: 0;
     flex-shrink: 0;
 }
 
-.iftp-gf-method-icon-wrap {
+.iftp-gf-method-item__icon-wrap {
     width: 72px;
     height: 32px;
     display: flex;
@@ -149,19 +152,19 @@ select option:disabled {
     margin-right: 6px;
 }
 
-/* is-wide is kept for backwards compat but no longer changes the size */
-.iftp-gf-method-icon-wrap.is-wide {
+/* --wide is kept for backwards compat but no longer changes the size */
+.iftp-gf-method-item__icon-wrap--wide {
     width: 72px;
 }
 
-.iftp-gf-method-icon-wrap img {
+.iftp-gf-method-item__icon-wrap img {
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
     display: block;
 }
 
-.iftp-gf-method-name {
+.iftp-gf-method-item__name {
     font-size: 13px;
     font-weight: 500;
     color: #1d2327;
@@ -170,14 +173,14 @@ select option:disabled {
     text-overflow: ellipsis;
 }
 
-.iftp-gf-method-right {
+.iftp-gf-method-item__right {
     display: flex;
     align-items: center;
     gap: 8px;
     flex-shrink: 0;
 }
 
-.iftp-gf-account-code {
+.iftp-gf-method-item__account {
     font-size: 11px;
     background: #f6f7f7;
     padding: 2px 6px;
@@ -185,31 +188,31 @@ select option:disabled {
     color: #50575e;
 }
 
-.iftp-gf-no-account {
+.iftp-gf-method-item__no-account {
     color: #8c8f94;
     font-size: 12px;
     font-style: italic;
 }
 
-.iftp-gf-active-badge {
+.iftp-gf-method-item__active-badge {
     color: #166534;
     font-size: 16px;
     font-weight: bold;
     line-height: 1;
 }
 
-.iftp-gf-method-account-select {
+.iftp-gf-method-item__account-select {
     font-size: 12px !important;
     width: 250px !important;
 }
 
-.iftp-gf-activation-sent,
-.iftp-gf-activation-cooldown {
+.iftp-gf-method-item__activation-sent,
+.iftp-gf-method-item__activation-cooldown {
     font-size: 12px;
     color: #646970;
 }
 
-.iftp-gf-activation-sent {
+.iftp-gf-method-item__activation-sent {
     color: #166534;
 }
 

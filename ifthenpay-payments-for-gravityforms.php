@@ -7,7 +7,7 @@ declare(strict_types=1);
  * Plugin URI:        https://ifthenpay.com
  * Description:       ifthenpay Pay by Link integration for Gravity Forms.
  * Version:           1.0.0
- * Tested up to:      6.9
+ * Tested up to:      7.0
  * Requires at least: 6.5
  * Requires PHP:      8.2
  * Author:            ifthenpay

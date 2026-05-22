@@ -17,10 +17,10 @@
 	 * Picks the best reference element for colour detection.
 	 *
 	 * Priority:
-	 *  1. .iftp-gf-methods-title   — uses --gf-ctrl-label-color-quaternary
-	 *  2. .iftp-gf-header-subtitle — uses --gf-color-out-ctrl-dark-darker
-	 *  3. .iftp-gf-header-title    — uses --gf-ctrl-label-color-quaternary
-	 *  4. document.body            — last-resort fallback
+	 *  1. .iftp-gf-box__methods-title  — uses --gf-ctrl-label-color-quaternary
+	 *  2. .iftp-gf-box__header-subtitle — uses --gf-color-out-ctrl-dark-darker
+	 *  3. .iftp-gf-box__header-title    — uses --gf-ctrl-label-color-quaternary
+	 *  4. document.body                 — last-resort fallback
 	 *
 	 * Checking one of our own text elements means the detection is scoped to
 	 * the GF theme CSS variables rather than whatever the page body happens to
@@ -29,16 +29,16 @@
 	 */
 	function refElement(field) {
 		return (
-			field.querySelector('.iftp-gf-methods-title') ||
-			field.querySelector('.iftp-gf-header-subtitle') ||
-			field.querySelector('.iftp-gf-header-title') ||
+			field.querySelector('.iftp-gf-box__methods-title') ||
+			field.querySelector('.iftp-gf-box__header-subtitle') ||
+			field.querySelector('.iftp-gf-box__header-title') ||
 			document.body
 		);
 	}
 
 	function applyLogos() {
 		const imgs = document.querySelectorAll(
-			'.iftp-gf-method-item img[data-src-dark]'
+			'.iftp-gf-box__method img[data-src-dark]'
 		);
 		if (!imgs.length) {
 			return;
@@ -53,7 +53,7 @@
 
 		imgs.forEach(function (img) {
 			const field =
-				img.closest('.iftp-gf-f-field') || document.body;
+				img.closest('.iftp-gf-field') || document.body;
 
 			const ref = refElement(field);
 			const b = brightness(window.getComputedStyle(ref).color);

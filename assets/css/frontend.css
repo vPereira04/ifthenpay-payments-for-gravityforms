@@ -6,7 +6,7 @@
 	box-sizing: border-box;
 }
 
-.iftp-gf-f-field {
+.iftp-gf-field {
 	margin: 0;
 	font-family: inherit;
 }
@@ -20,7 +20,7 @@
  * --gf-ctrl-size, not padding-y, so reusing it would flatten our card).
  * Each fallback matches the legacy 2.5 theme look.
  */
-.iftp-gf-public-box {
+.iftp-gf-box {
 	max-width: 100%;
 	background: var(--gf-ctrl-bg-color, #fff);
 	color: var(--gf-ctrl-color, var(--gf-color-out-ctrl-dark-darker, #112337));
@@ -37,13 +37,13 @@
 }
 
 /* ---- Header (logo + title) ---- */
-.iftp-gf-header {
+.iftp-gf-box__header {
 	display: flex;
 	align-items: center;
 	margin-bottom: 12px;
 }
 
-.iftp-gf-header-icon {
+.iftp-gf-box__header-icon {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -53,48 +53,48 @@
 	flex-shrink: 0;
 }
 
-.iftp-gf-header-text {
+.iftp-gf-box__header-text {
 	margin-left: 10px;
 	line-height: 1.2;
 }
 
-.iftp-gf-header-title {
+.iftp-gf-box__header-title {
 	font-weight: 600;
 	color: var(--gf-ctrl-label-color-quaternary, #112337);
 	font-size: var(--gf-font-size-secondary, 14px);
 }
 
-.iftp-gf-header-subtitle {
+.iftp-gf-box__header-subtitle {
 	font-size: var(--gf-font-size-tertiary, 13px);
 	color: var(--gf-color-out-ctrl-dark-darker, #585e6a);
 	margin-top: 2px;
 }
 
 /* ---- Methods row ---- */
-.iftp-gf-methods-section {
+.iftp-gf-box__methods {
 	padding: 8px 0 4px;
 }
 
-.iftp-gf-methods-title {
+.iftp-gf-box__methods-title {
 	font-size: var(--gf-font-size-tertiary, 13px);
 	font-weight: 600;
 	color: var(--gf-ctrl-label-color-quaternary, #112337);
 	margin-bottom: 10px;
 }
 
-.iftp-gf-preview-methods {
+.iftp-gf-box__methods-list {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 10px;
 }
 
-.iftp-gf-method-item {
+.iftp-gf-box__method {
 	display: flex;
 	align-items: center;
 	justify-content: center;
 }
 
-.iftp-gf-logo {
+.iftp-gf-box__method-logo {
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -105,15 +105,15 @@
 	transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.iftp-gf-method-item[data-entity="CCARD"] .iftp-gf-logo {
+.iftp-gf-box__method[data-entity="CCARD"] .iftp-gf-box__method-logo {
 	width: 90px;
 }
 
-.iftp-gf-logo picture {
+.iftp-gf-box__method-logo picture {
 	display: contents;
 }
 
-.iftp-gf-logo img {
+.iftp-gf-box__method-logo img {
 	max-width: 100%;
 	max-height: 100%;
 	object-fit: contain;
@@ -121,7 +121,7 @@
 }
 
 /* ---- Info block (subtle inset using the form's outer-surface light tint) ---- */
-.iftp-gf-info {
+.iftp-gf-box__info {
 	margin-top: 12px;
 	padding: 10px 12px;
 	border-radius: var(--gf-radius, 3px);
@@ -129,29 +129,29 @@
 	color: var(--gf-ctrl-label-color-quaternary, #112337);
 }
 
-.iftp-gf-info strong {
+.iftp-gf-box__info strong {
 	color: var(--gf-ctrl-label-color-quaternary, #112337);
 }
 
-.iftp-gf-info ul {
+.iftp-gf-box__info ul {
 	margin: 6px 0 0;
 	padding-left: 18px;
 }
 
-.iftp-gf-info ul li + li {
+.iftp-gf-box__info ul li + li {
 	margin-top: 2px;
 }
 
-.iftp-gf-section-infos {
-  color: var(--gf-color-out-ctrl-dark-darker, #585e6a)
+.iftp-gf-box__info-list {
+	color: var(--gf-color-out-ctrl-dark-darker, #585e6a);
 }
 
 /* ---- Pay button (uses GF orbital token variables) ---- */
-.iftp-gf-pay-row {
+.iftp-gf-box__pay {
 	margin-top: 18px;
 }
 
-.iftp-gf-pay-now-button {
+.iftp-gf-box__pay-btn {
 	appearance: none;
 	display: inline-flex;
 	align-items: center;
@@ -169,28 +169,28 @@
 	transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
-.iftp-gf-pay-now-button:disabled {
+.iftp-gf-box__pay-btn:disabled {
 	opacity: 0.55;
 	cursor: not-allowed;
 }
 
-.iftp-gf-pay-now-button:hover:not(:disabled) {
+.iftp-gf-box__pay-btn:hover:not(:disabled) {
 	background: var(--gf-color-primary-darker, #001AB3);
 	border-color: var(--gf-color-primary-darker, #001AB3);
 }
 
-.iftp-gf-pay-now-button.is-paid {
+.iftp-gf-box__pay-btn--paid {
 	background: #198754;
 	border-color: #198754;
 }
 
-.iftp-gf-pay-now-button.is-paid:hover {
+.iftp-gf-box__pay-btn--paid:hover {
 	background: #157347;
 	border-color: #157347;
 }
 
 /* ---- Spinner ---- */
-.iftp-gf-spinner {
+.iftp-gf-box__spinner {
 	width: 14px;
 	height: 14px;
 	border: 2px solid rgb(255 255 255 / 40%);
@@ -201,7 +201,7 @@
 	flex-shrink: 0;
 }
 
-.iftp-gf-pay-now-button.is-loading .iftp-gf-spinner {
+.iftp-gf-box__pay-btn--loading .iftp-gf-box__spinner {
 	display: inline-block;
 }
 
@@ -218,10 +218,10 @@
 	display: none;
 }
 
-.iftp-gf-status.is-visible { display: block; }
-.iftp-gf-status.is-success { color: #1b5e20; }
-.iftp-gf-status.is-error   { background: #fdecea;}
-.iftp-gf-status.is-info    { border: 1px solid #90caf9; }
+.iftp-gf-status--visible { display: block; }
+.iftp-gf-status--success { color: #1b5e20; }
+.iftp-gf-status--error   { background: #fdecea; }
+.iftp-gf-status--info    { border: 1px solid #90caf9; }
 
 .iftp-gf-runtime-warning {
 	margin-top: 10px;
@@ -236,8 +236,8 @@
 
 /* ---- Responsive ---- */
 @media (width <= 600px) {
-	.iftp-gf-public-box     { padding: 12px; }
-	.iftp-gf-pay-now-button { width: 100%; }
+	.iftp-gf-box          { padding: 12px; }
+	.iftp-gf-box__pay-btn { width: 100%; }
 }
 
 /* -------------------------------------------------------------------------
@@ -262,14 +262,14 @@
 	line-height: 1.5;
 }
 
-.iftp-gf-return-notice-text {
+.iftp-gf-return-notice__text {
 	display: flex;
 	flex-direction: column;
 	gap: 3px;
 }
 
 /* Icon sizing — colour set per-variant below */
-.iftp-gf-return-icon {
+.iftp-gf-return-notice__icon {
 	flex-shrink: 0;
 	font-size: 18px;
 	line-height: 1;
@@ -282,7 +282,7 @@
 	border-color: #a7f3d0;
 	color: #065f46;
 }
-.iftp-gf-return-notice--success .iftp-gf-return-icon { color: #10b981; }
+.iftp-gf-return-notice--success .iftp-gf-return-notice__icon { color: #10b981; }
 
 /* info (pending) */
 .iftp-gf-return-notice--info .gform_confirmation_message {
@@ -290,7 +290,7 @@
 	border-color: #bfdbfe;
 	color: #1e3a8a;
 }
-.iftp-gf-return-notice--info .iftp-gf-return-icon { color: #3b82f6; }
+.iftp-gf-return-notice--info .iftp-gf-return-notice__icon { color: #3b82f6; }
 
 /* cancel — override GF's default red to amber/warning */
 .iftp-gf-return-notice--cancel.gform_validation_errors {
@@ -298,13 +298,13 @@
 	border-color: #fde68a;
 	color: #92400e;
 }
-.iftp-gf-return-notice--cancel .iftp-gf-return-icon { color: #f59e0b; }
+.iftp-gf-return-notice--cancel .iftp-gf-return-notice__icon { color: #f59e0b; }
 
 /* error — GF's gform_validation_errors already provides red styling */
-.iftp-gf-return-notice--error .iftp-gf-return-icon { color: inherit; }
+.iftp-gf-return-notice--error .iftp-gf-return-notice__icon { color: inherit; }
 
 /* Body paragraph inside error/cancel notices */
-.iftp-gf-return-notice-body {
+.iftp-gf-return-notice__body {
 	margin: 6px 0 0;
 	font-size: var(--gf-font-size-tertiary, 13px);
 	opacity: 0.88;

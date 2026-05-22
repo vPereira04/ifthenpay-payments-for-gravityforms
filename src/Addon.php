@@ -106,7 +106,7 @@ class Addon extends \GFPaymentAddOn {
 		);
 		wp_enqueue_script(
 			'ifthenpay_gf_frontend',
-			\IFTP_GF_URL . 'assets/js/frontend.js',
+			\IFTP_GF_URL . 'assets/js/frontend.min.js',
 			[],
 			\IFTP_GF_VERSION,
 			true
@@ -137,7 +137,7 @@ class Addon extends \GFPaymentAddOn {
 			],
 			[
 				'handle'  => 'ifthenpay_gf_admin',
-				'src'     => \IFTP_GF_URL . 'assets/js/admin.js',
+				'src'     => \IFTP_GF_URL . 'assets/js/admin.min.js',
 				'version' => \IFTP_GF_VERSION,
 				'deps'    => [ 'jquery' ],
 				'strings' => [
@@ -225,7 +225,7 @@ class Addon extends \GFPaymentAddOn {
 		</p>
 		<?php endif; ?>
 
-		<div class="iftp-gf-key-row<?php echo $is_connected ? ' iftp-gf-key-field-hidden' : ''; ?>">
+		<div class="iftp-gf-key-row<?php echo $is_connected ? ' iftp-gf-key-row--hidden' : ''; ?>">
 			<input
 				type="text"
 				id="iftp-gf-backoffice-key-input"
@@ -341,6 +341,7 @@ class Addon extends \GFPaymentAddOn {
 		$html = (string) ob_get_clean();
 
 		if ( $echo ) {
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Sanitized via static kses_admin_html().
 			echo self::kses_admin_html( $html );
 		}
 
@@ -422,18 +423,18 @@ class Addon extends \GFPaymentAddOn {
 				$is_wide_logo  = $entity_key === 'CCARD';
 
 				$item_classes = 'iftp-gf-method-item';
-				if ( $is_enabled )         { $item_classes .= ' is-enabled'; }
-				if ( ! $is_provisioned )   { $item_classes .= ' is-unactivated'; }
+				if ( $is_enabled )         { $item_classes .= ' iftp-gf-method-item--enabled'; }
+				if ( ! $is_provisioned )   { $item_classes .= ' iftp-gf-method-item--unactivated'; }
 			?>
 				<div class="<?php echo esc_attr( $item_classes ); ?>" data-entity="<?php echo esc_attr( $entity_key ); ?>">
-					<label class="iftp-gf-method-item-label">
+					<label class="iftp-gf-method-item__label">
 						<input
 							type="checkbox"
 							name="_gform_setting_methods_config[<?php echo esc_attr( $entity_key ); ?>][enabled]"
 							value="1"
 							<?php checked( $is_enabled ); ?>
 							<?php disabled( ! $is_provisioned ); ?>
-							class="iftp-gf-method-toggle"
+							class="iftp-gf-method-item__toggle"
 							data-entity="<?php echo esc_attr( $entity_key ); ?>"
 						/>
 						<input
@@ -441,21 +442,21 @@ class Addon extends \GFPaymentAddOn {
 							name="_gform_setting_methods_config[<?php echo esc_attr( $entity_key ); ?>][account]"
 							value="<?php echo esc_attr( $account ); ?>"
 						/>
-						<span class="iftp-gf-method-icon-wrap<?php echo $is_wide_logo ? ' is-wide' : ''; ?>">
+						<span class="iftp-gf-method-item__icon-wrap<?php echo $is_wide_logo ? ' iftp-gf-method-item__icon-wrap--wide' : ''; ?>">
 							<img src="<?php echo esc_url( $logo_url ); ?>" alt="<?php echo esc_attr( $method_label ); ?>" loading="lazy" />
 						</span>
-						<span class="iftp-gf-method-name"><?php echo esc_html( $method_label ); ?></span>
+						<span class="iftp-gf-method-item__name"><?php echo esc_html( $method_label ); ?></span>
 					</label>
 
-					<div class="iftp-gf-method-right">
+					<div class="iftp-gf-method-item__right">
 						<?php if ( $is_provisioned ) : ?>
-							<code class="iftp-gf-account-code"><?php echo esc_html( $account ); ?></code>
-							<span class="iftp-gf-active-badge" title="<?php esc_attr_e( 'Provisioned', 'ifthenpay-payments-for-gravityforms' ); ?>">&#10003;</span>
+							<code class="iftp-gf-method-item__account"><?php echo esc_html( $account ); ?></code>
+							<span class="iftp-gf-method-item__active-badge" title="<?php esc_attr_e( 'Provisioned', 'ifthenpay-payments-for-gravityforms' ); ?>">&#10003;</span>
 						<?php else : ?>
-							<em class="iftp-gf-no-account"><?php esc_html_e( 'Not activated', 'ifthenpay-payments-for-gravityforms' ); ?></em>
+							<em class="iftp-gf-method-item__no-account"><?php esc_html_e( 'Not activated', 'ifthenpay-payments-for-gravityforms' ); ?></em>
 							<button
 								type="button"
-								class="button button-small iftp-gf-activate-method"
+								class="button button-small iftp-gf-method-item__activate-btn"
 								data-entity="<?php echo esc_attr( $entity_key ); ?>"
 								data-gateway-key="<?php echo esc_attr( $gateway_key ); ?>"
 							>
@@ -528,6 +529,7 @@ class Addon extends \GFPaymentAddOn {
 		$html = (string) ob_get_clean();
 
 		if ( $echo ) {
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Sanitized via static kses_admin_html().
 			echo self::kses_admin_html( $html );
 		}
 
@@ -1129,7 +1131,7 @@ class Addon extends \GFPaymentAddOn {
 
 		$b          = $banners[ $status ];
 		$icon_span  = sprintf(
-			'<span class="gform-icon gform-icon--%s iftp-gf-return-icon" aria-hidden="true"></span>',
+			'<span class="gform-icon gform-icon--%s iftp-gf-return-notice__icon" aria-hidden="true"></span>',
 			esc_attr( $b['icon'] )
 		);
 
@@ -1138,7 +1140,7 @@ class Addon extends \GFPaymentAddOn {
 			$banner = sprintf(
 				'<div class="gform_validation_errors gform-theme__no-reset--children iftp-gf-return-notice iftp-gf-return-notice--%1$s" role="alert" aria-live="assertive">'
 				. '<h2 class="gform_submission_error">%2$s%3$s</h2>'
-				. '<p class="iftp-gf-return-notice-body">%4$s</p>'
+				. '<p class="iftp-gf-return-notice__body">%4$s</p>'
 				. '</div>',
 				esc_attr( $b['variant'] ),
 				$icon_span,
@@ -1149,7 +1151,7 @@ class Addon extends \GFPaymentAddOn {
 
 			$banner = sprintf(
 				'<div class="gform_confirmation_wrapper gform-theme__no-reset--children iftp-gf-return-notice iftp-gf-return-notice--%1$s" role="status" aria-live="polite">'
-				. '<div class="gform_confirmation_message">%2$s<div class="iftp-gf-return-notice-text"><strong>%3$s</strong><span>%4$s</span></div></div>'
+				. '<div class="gform_confirmation_message">%2$s<div class="iftp-gf-return-notice__text"><strong>%3$s</strong><span>%4$s</span></div></div>'
 				. '</div>',
 				esc_attr( $b['variant'] ),
 				$icon_span,
@@ -1324,7 +1326,6 @@ class Addon extends \GFPaymentAddOn {
 				try {
 					$verified = IfthenpayClient::verify_transaction_paid( $tx );
 				} catch ( \RuntimeException $e ) {
-					error_log( sprintf( '[ifthenpay-gf] verify_transaction_paid() error for entry #%d tx=%s: %s', $entry_id, $tx, $e->getMessage() ) );
 				}
 			}
 
