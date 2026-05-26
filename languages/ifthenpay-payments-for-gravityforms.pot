@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Ifthenpay | Payments for GravityForms 1.0.0\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/ifthenpay-payments-for-gravityforms\n"
-"POT-Creation-Date: 2026-05-22 15:03:20+00:00\n"
+"POT-Creation-Date: 2026-05-21 10:47:39+00:00\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -24,7 +24,7 @@ msgstr ""
 msgid "Connect"
 msgstr ""
 
-#: src/Addon.php:148 src/Addon.php:1742
+#: src/Addon.php:148 src/Addon.php:247 src/Addon.php:1577
 msgid "Disconnect"
 msgstr ""
 
@@ -32,7 +32,7 @@ msgstr ""
 msgid "Request failed. Please try again."
 msgstr ""
 
-#: src/Addon.php:150 src/Addon.php:464
+#: src/Addon.php:150 src/Addon.php:410 src/Addon.php:542
 msgid "Request Activation"
 msgstr ""
 
@@ -48,10 +48,6 @@ msgstr ""
 msgid "Request already sent. Please wait 24 hours."
 msgstr ""
 
-#: src/Addon.php:154
-msgid "Loading payment methods…"
-msgstr ""
-
 #: src/Addon.php:196
 msgid "ifthenpay | Payment Gateway"
 msgstr ""
@@ -64,275 +60,255 @@ msgstr ""
 msgid "Not a client? Sign up here."
 msgstr ""
 
-#: src/Addon.php:262
+#: src/Addon.php:244 src/Addon.php:1574
+msgid "Connected"
+msgstr ""
+
+#: src/Addon.php:245 src/Addon.php:1575
+msgid "Your Backoffice Key is connected. Open any form's Settings → ifthenpay to configure gateway keys and payment methods."
+msgstr ""
+
+#: src/Addon.php:274
 msgid "Feed Settings"
 msgstr ""
 
-#: src/Addon.php:265
+#: src/Addon.php:277
 msgid "Feed Name"
 msgstr ""
 
-#: src/Addon.php:270
+#: src/Addon.php:282
 msgid "A name for this payment feed. Used to identify it in the feed list."
 msgstr ""
 
-#: src/Addon.php:273 src/Addon.php:492
+#: src/Addon.php:285 src/Addon.php:571
 msgid "Gateway Key"
 msgstr ""
 
-#: src/Addon.php:276
-msgid "Select the ifthenpay gateway key for this form. The payment methods table updates automatically when you change the selection."
+#: src/Addon.php:288
+msgid "Select the ifthenpay gateway key for this form. After changing the selection, click \"Update Settings\" to load the methods provisioned on that gateway."
 msgstr ""
 
-#: src/Addon.php:280 src/Addon.php:494
+#: src/Addon.php:292 src/Addon.php:573
 msgid "Payment Methods"
 msgstr ""
 
-#: src/Addon.php:284
+#: src/Addon.php:296
 msgid "Enable the payment methods available on this gateway. Disabled methods will not appear at checkout."
 msgstr ""
 
-#: src/Addon.php:287
+#: src/Addon.php:299
 msgid "Default Method"
 msgstr ""
 
-#: src/Addon.php:290
+#: src/Addon.php:302
 msgid "The payment method preselected when the customer opens the Pay By Link page. Methods you have not enabled above are shown but cannot be selected."
 msgstr ""
 
-#: src/Addon.php:294
+#: src/Addon.php:306
 msgid "Payment Description"
 msgstr ""
 
-#: src/Addon.php:298
+#: src/Addon.php:310
 msgid "Optional description shown on the payment page (e.g., the store or product name)."
 msgstr ""
 
-#: src/Addon.php:343
+#: src/Addon.php:340 src/Addon.php:407
 msgid "Select a gateway key above to load available payment methods."
 msgstr ""
 
-#: src/Addon.php:345
+#: src/Addon.php:344 src/Addon.php:408
 msgid "No payment methods are provisioned on this gateway."
 msgstr ""
 
-#: src/Addon.php:455
-msgid "Provisioned"
-msgstr ""
-
-#: src/Addon.php:457
+#: src/Addon.php:409 src/Addon.php:535
 msgid "Not activated"
 msgstr ""
 
-#: src/Addon.php:485
+#: src/Addon.php:411 src/Addon.php:533
+msgid "Provisioned"
+msgstr ""
+
+#: src/Addon.php:412 src/Addon.php:1752
+msgid "— Auto (first enabled method) —"
+msgstr ""
+
+#: src/Addon.php:564
 msgid "No GravityForms-type gateways found for this backoffice key. Contact ifthenpay support if you expect one."
 msgstr ""
 
-#: src/Addon.php:488
+#: src/Addon.php:567
 msgid "Loaded Gateways"
 msgstr ""
 
-#: src/Addon.php:493
+#: src/Addon.php:572
 msgid "Alias"
 msgstr ""
 
-#: src/Addon.php:519
+#: src/Addon.php:598
 msgid "No provisioned methods on this gateway."
 msgstr ""
 
 #. translators: %s: link to plugin settings page
 
-#: src/Addon.php:552
+#: src/Addon.php:630
 msgid "To get started, %s."
 msgstr ""
 
-#: src/Addon.php:554
+#: src/Addon.php:632
 msgid "connect your ifthenpay Backoffice Key"
 msgstr ""
 
 #. translators: %s: comma-separated list of other payment add-on slugs
 
-#: src/Addon.php:590
+#: src/Addon.php:669
 msgid "⚠ This form already has an active payment feed from another add-on (%s). Only one payment gateway is allowed per form — customers will be blocked from submitting until the conflict is resolved."
 msgstr ""
 
-#: src/Addon.php:627
-msgid "Please enable at least one payment method before saving."
-msgstr ""
-
-#: src/Addon.php:640 src/Addon.php:668
+#: src/Addon.php:706 src/Addon.php:734
 msgid "Another ifthenpay feed is already active on this form. Deactivate it first before activating this one."
-msgstr ""
-
-#: src/Addon.php:991 src/Field/GF_Field_Ifthenpay.php:83
-msgid "Payment is not available: ifthenpay is not connected. Please contact the site administrator."
-msgstr ""
-
-#: src/Addon.php:1005
-msgid "Payment is not available: no payment methods are enabled for this form. Please contact the site administrator."
 msgstr ""
 
 #. translators: %s: comma-separated list of other payment add-on slugs
 
-#: src/Addon.php:1017
+#: src/Addon.php:1071
 msgid "This form has more than one active payment add-on configured (ifthenpay + %s). Only one payment gateway is allowed per form — please remove the extra feeds before customers can pay."
 msgstr ""
 
-#: src/Addon.php:1034
+#: src/Addon.php:1090
 msgid "Payment amount could not be determined. The form needs at least one pricing field (Product, Total, Shipping, or Quantity) for the amount to be calculated."
 msgstr ""
 
-#: src/Addon.php:1104
+#: src/Addon.php:1160
 msgid "Payment received"
 msgstr ""
 
-#: src/Addon.php:1105
+#: src/Addon.php:1161
 msgid "Thank you — your payment has been confirmed and the form was submitted successfully."
 msgstr ""
 
-#: src/Addon.php:1110
+#: src/Addon.php:1165
 msgid "Awaiting payment confirmation"
 msgstr ""
 
-#: src/Addon.php:1111
+#: src/Addon.php:1166
 msgid "Your payment reference has been generated. The form will be confirmed automatically once ifthenpay receives the payment — you can close this page in the meantime."
 msgstr ""
 
-#: src/Addon.php:1116
+#: src/Addon.php:1170
 msgid "Payment failed"
 msgstr ""
 
-#: src/Addon.php:1117
-msgid "Something went wrong at the payment gateway and your payment was not processed. Please submit the form again to retry."
+#: src/Addon.php:1171
+msgid "Something went wrong! Your payment was not processed. Please submit the form again to retry."
 msgstr ""
 
-#: src/Addon.php:1122
+#: src/Addon.php:1175
 msgid "Payment cancelled"
 msgstr ""
 
-#: src/Addon.php:1123
+#: src/Addon.php:1176
 msgid "You cancelled the payment before it was completed. Submit the form again if you want to try a different method."
 msgstr ""
 
-#: src/Addon.php:1210
+#: src/Addon.php:1251
 msgid "Payment cancelled at the ifthenpay gateway (server-side callback)."
 msgstr ""
 
-#: src/Addon.php:1357
+#: src/Addon.php:1399
 msgid "Payment cancelled by the customer at the ifthenpay gateway."
 msgstr ""
 
-#: src/Addon.php:1566
-msgid "Payment confirmed by expiry safety-net check — webhook was not received. Entry marked Paid."
-msgstr ""
-
-#: src/Addon.php:1583
-msgid "Payment reference expired with no payment received. Entry marked Failed."
-msgstr ""
-
-#: src/Addon.php:1595 src/Addon.php:1641 src/Addon.php:1659
+#: src/Addon.php:1446 src/Addon.php:1495
 msgid "Insufficient permissions."
 msgstr ""
 
-#: src/Addon.php:1603
+#: src/Addon.php:1454
 msgid "Enter a valid Backoffice Key before connecting."
 msgstr ""
 
-#: src/Addon.php:1607
+#: src/Addon.php:1458
 msgid "Invalid Backoffice Key format."
 msgstr ""
 
 #. translators: 1: support email link, 2: sign-up link
 
-#: src/Addon.php:1621
+#: src/Addon.php:1475
 msgid "No gateway found for this backoffice key. If you are a client, %1$s to request one. Otherwise, %2$s."
 msgstr ""
 
-#: src/Addon.php:1622
+#: src/Addon.php:1476
 msgid "contact support"
 msgstr ""
 
-#: src/Addon.php:1623
+#: src/Addon.php:1477
 msgid "sign up here"
 msgstr ""
 
-#: src/Addon.php:1631
+#: src/Addon.php:1485
 msgid "Backoffice Key connected successfully."
 msgstr ""
 
-#: src/Addon.php:1648
+#: src/Addon.php:1510
 msgid "Backoffice Key disconnected."
 msgstr ""
 
-#: src/Addon.php:1667 src/Addon.php:1911
-msgid "— Auto (first enabled method) —"
-msgstr ""
-
-#: src/Addon.php:1702
+#: src/Addon.php:1535
 msgid "Missing entity or gateway key."
 msgstr ""
 
-#: src/Addon.php:1707
+#: src/Addon.php:1540
 msgid "Activation request already sent. Please wait 24 hours before requesting again."
 msgstr ""
 
-#: src/Addon.php:1726
+#: src/Addon.php:1559
 msgid "Activation request sent to ifthenpay support."
 msgstr ""
 
-#: src/Addon.php:1739
-msgid "Connected"
-msgstr ""
-
-#: src/Addon.php:1740
-msgid "Your Backoffice Key is connected. Open any form's Settings → ifthenpay to configure gateway keys and payment methods."
-msgstr ""
-
-#: src/Addon.php:1885
+#: src/Addon.php:1726
 msgid "— Select a gateway key —"
 msgstr ""
 
-#: src/Field/GF_Field_Ifthenpay.php:24
+#: src/Field/GF_Field_Ifthenpay.php:22
 msgid "ifthenpay"
 msgstr ""
 
-#: src/Field/GF_Field_Ifthenpay.php:99
+#: src/Field/GF_Field_Ifthenpay.php:98
 msgid "No ifthenpay feed configured for this form. Go to Form Settings → ifthenpay to add one."
 msgstr ""
 
-#: src/Field/GF_Field_Ifthenpay.php:103
-msgid "No payment methods are enabled for this form. Go to Form Settings → ifthenpay to enable at least one payment method."
+#: src/Field/GF_Field_Ifthenpay.php:102
+msgid "Payment is not available at this time. Please contact the site administrator."
 msgstr ""
 
-#: src/Field/GF_Field_Ifthenpay.php:121 src/Field/GF_Field_Ifthenpay.php:199
+#: src/Field/GF_Field_Ifthenpay.php:120 src/Field/GF_Field_Ifthenpay.php:195
 msgid "Payment Gateway"
 msgstr ""
 
-#: src/Field/GF_Field_Ifthenpay.php:127
+#: src/Field/GF_Field_Ifthenpay.php:126
 msgid "Payment methods:"
 msgstr ""
 
-#: src/Field/GF_Field_Ifthenpay.php:157
+#: src/Field/GF_Field_Ifthenpay.php:148
 msgid "How it works:"
 msgstr ""
 
-#: src/Field/GF_Field_Ifthenpay.php:159
+#: src/Field/GF_Field_Ifthenpay.php:150
 msgid "After submitting the form, you will be redirected to the secure ifthenpay payment page."
 msgstr ""
 
-#: src/Field/GF_Field_Ifthenpay.php:160
+#: src/Field/GF_Field_Ifthenpay.php:151
 msgid "Pick your preferred payment method on that page and complete the payment."
 msgstr ""
 
-#: src/Field/GF_Field_Ifthenpay.php:161
+#: src/Field/GF_Field_Ifthenpay.php:152
 msgid "ifthenpay only accepts EUR as the payment currency."
 msgstr ""
 
-#: src/Field/GF_Field_Ifthenpay.php:203
+#: src/Field/GF_Field_Ifthenpay.php:199
 msgid "Payment methods are loaded from the form's ifthenpay feed at runtime. After form submission the customer is redirected to the ifthenpay payment page."
 msgstr ""
 
-#: src/Field/GF_Field_Ifthenpay.php:213
+#: src/Field/GF_Field_Ifthenpay.php:209
 msgid "No payment data."
 msgstr ""
 #. Plugin Name of the plugin/theme

@@ -34,7 +34,7 @@ class Addon extends \GFPaymentAddOn {
 	protected $_full_path                = IFTP_GF_FILE;
 	protected $_title                    = 'Ifthenpay | Payments for GravityForms';
 	protected $_short_title              = 'ifthenpay';
-	protected $_supports_callbacks       = false;
+	protected $_supports_callbacks       = true;
 	protected $_requires_credit_card     = false;
 
 	private static ?self $_instance = null;
@@ -68,14 +68,7 @@ class Addon extends \GFPaymentAddOn {
 		parent::init();
 
 		\GF_Fields::register( new \Ifthenpay\GravityForms\Field\GF_Field_Ifthenpay() );
-		add_action( 'wp', [ $this, 'handle_gateway_return' ] );
-		add_action( 'wp', [ $this, 'handle_gateway_callback' ] );
-
-
-		add_action( 'iftp_gf_expire_pending_payment', [ $this, 'expire_pending_payment' ] );
-
-
-		add_action( 'wp', [ $this, 'maybe_process_overdue_payments' ], 20 );
+		add_action( 'template_redirect', [ $this, 'handle_gateway_return' ], 5 );
 
 
 		add_filter( 'gform_validation', [ $this, 'enforce_single_payment_gateway' ] );
@@ -632,15 +625,27 @@ class Addon extends \GFPaymentAddOn {
 
 		$result = parent::save_feed_settings( $feed_id, $form_id, $settings );
 		if ( $result ) {
-			$saved_feed_id = (int) $result;
+			$saved_feed_id   = (int) $result;
+			$forced_inactive = false;
+
 
 			if ( $this->has_other_active_feed( (int) $form_id, $saved_feed_id ) ) {
 				$this->update_feed_active( $saved_feed_id, 0 );
+				$forced_inactive = true;
 				\GFCommon::add_error_message(
 					__( 'Another ifthenpay feed is already active on this form. Deactivate it first before activating this one.', 'ifthenpay-payments-for-gravityforms' )
 				);
 			}
-			$this->sync_form_payment_info( (int) $form_id, $settings );
+
+
+			if ( ! $forced_inactive ) {
+				$this->sync_form_payment_info( (int) $form_id, $settings, $saved_feed_id );
+
+				$gateway_key = (string) ( $settings['gateway_key'] ?? '' );
+				if ( $gateway_key !== '' ) {
+					$this->activate_callback_for_gateway( $gateway_key );
+				}
+			}
 		}
 		return $result;
 	}
@@ -658,6 +663,7 @@ class Addon extends \GFPaymentAddOn {
 	public function update_feed_active( $feed_id, $is_active ) {
 		$feed_id_int = (int) $feed_id;
 		$activating  = ! empty( $is_active );
+		$feed        = null;
 
 		if ( $activating && $feed_id_int > 0 ) {
 			$feed = $this->get_feed( $feed_id_int );
@@ -672,7 +678,33 @@ class Addon extends \GFPaymentAddOn {
 			}
 		}
 
-		return parent::update_feed_active( $feed_id, $is_active );
+		$result = parent::update_feed_active( $feed_id, $is_active );
+
+
+		if ( $result && $activating && $feed !== null ) {
+			$form_id = (int) ( $feed['form_id'] ?? 0 );
+			if ( $form_id > 0 ) {
+				$per_feed_snapshot = FormPaymentInfo::get_for_feed( $feed_id_int );
+				if ( ! empty( $per_feed_snapshot ) ) {
+					FormPaymentInfo::save( $form_id, $per_feed_snapshot );
+				} else {
+
+					$this->sync_form_payment_info( $form_id, (array) ( $feed['meta'] ?? [] ) );
+				}
+			}
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Clean up the per-feed snapshot when a feed is deleted.
+	 *
+	 * @param int $id Feed ID.
+	 */
+	public function delete_feed( $id ): void {
+		FormPaymentInfo::delete_for_feed( (int) $id );
+		parent::delete_feed( $id );
 	}
 
 	/**
@@ -693,10 +725,11 @@ class Addon extends \GFPaymentAddOn {
 	}
 
 	/**
-	 * Builds and persists the per-form payment snapshot.
-	 * Option key: `ifthenpay_gf_form_{$form_id}`.
+	 * Builds and persists the per-form payment snapshot (and, when $feed_id > 0,
+	 * also a per-feed snapshot so the config can be restored without an API call).
+	 * Option keys: `ifthenpay_gf_form_{$form_id}` / `ifthenpay_gf_feed_{$feed_id}`.
 	 */
-	public function sync_form_payment_info( int $form_id, array $settings ): void {
+	public function sync_form_payment_info( int $form_id, array $settings, int $feed_id = 0 ): void {
 		$gateway_key = (string) ( $settings['gateway_key'] ?? '' );
 		if ( $gateway_key === '' ) {
 			FormPaymentInfo::delete( $form_id );
@@ -716,7 +749,7 @@ class Addon extends \GFPaymentAddOn {
 			if ( (string) ( $row['account'] ?? '' ) === '' ) {
 				continue;
 			}
-			$position	   = $row['position'];
+			$position      = $row['position'];
 			$entity        = $row['entity'];
 			$is_active     = ! empty( $methods_config[ $entity ]['enabled'] );
 			$pay_methods[] = [
@@ -729,15 +762,19 @@ class Addon extends \GFPaymentAddOn {
 			];
 		}
 
-		FormPaymentInfo::save(
-			$form_id,
-			[
-				'gateway_key'     => $gateway_key,
-				'default_method'  => strtoupper( (string) ( $settings['default_method'] ?? '' ) ),
-				'pay_description' => sanitize_text_field( (string) ( $settings['description'] ?? '' ) ),
-				'pay_methods'     => $pay_methods,
-			]
-		);
+		$snapshot = [
+			'gateway_key'     => $gateway_key,
+			'default_method'  => strtoupper( (string) ( $settings['default_method'] ?? '' ) ),
+			'pay_description' => sanitize_text_field( (string) ( $settings['description'] ?? '' ) ),
+			'pay_methods'     => $pay_methods,
+		];
+
+		FormPaymentInfo::save( $form_id, $snapshot );
+
+
+		if ( $feed_id > 0 ) {
+			FormPaymentInfo::save_for_feed( $feed_id, $snapshot );
+		}
 	}
 
 	/**
@@ -747,6 +784,33 @@ class Addon extends \GFPaymentAddOn {
 	 */
 	public static function get_form_payment_info( int $form_id ): array {
 		return FormPaymentInfo::get( $form_id );
+	}
+
+	/**
+	 * Registers the webhook callback URL for the given gateway key with ifthenpay.
+	 *
+	 * Called every time a feed is saved with a gateway key. Re-activation is
+	 * idempotent — ifthenpay simply updates the registered URL. Failures are
+	 * logged but do not block the feed save; async payments will still resolve
+	 * via the expiry safety-net check if the webhook never fires.
+	 */
+	private function activate_callback_for_gateway( string $gateway_key ): void {
+		$base_url  = add_query_arg( 'callback', $this->get_slug(), home_url( '/' ) );
+		$activated = IfthenpayClient::activate_callback( $gateway_key, $base_url );
+
+		if ( $activated ) {
+			$this->log_debug( sprintf(
+				'%s(): Callback activated for gateway key %s.',
+				__METHOD__,
+				$gateway_key
+			) );
+		} else {
+			$this->log_error( sprintf(
+				'%s(): Failed to activate callback for gateway key %s. Async payments will fall back to the expiry safety-net check.',
+				__METHOD__,
+				$gateway_key
+			) );
+		}
 	}
 
 
@@ -923,9 +987,6 @@ class Addon extends \GFPaymentAddOn {
 
 		\GFAPI::update_entry_property( $entry_id, 'payment_status', 'Processing' );
 
-
-		$this->schedule_expiry_check( $entry_id );
-
 		$this->log_debug( __METHOD__ . "(): Entry #{$entry_id} → redirect to ifthenpay. TxID: {$transaction_id}" );
 
 		return $redirect_url;
@@ -1097,28 +1158,29 @@ class Addon extends \GFPaymentAddOn {
 			);
 		}
 
+
 		$banners = [
 			'paid'      => [
 				'variant' => 'success',
-				'icon'    => 'circle-check-alt',
+				'svg'     => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" width="20" height="20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/></svg>',
 				'title'   => __( 'Payment received', 'ifthenpay-payments-for-gravityforms' ),
 				'body'    => __( 'Thank you — your payment has been confirmed and the form was submitted successfully.', 'ifthenpay-payments-for-gravityforms' ),
 			],
 			'pending'   => [
 				'variant' => 'info',
-				'icon'    => 'circle-notice',
+				'svg'     => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" width="20" height="20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clip-rule="evenodd"/></svg>',
 				'title'   => __( 'Awaiting payment confirmation', 'ifthenpay-payments-for-gravityforms' ),
 				'body'    => __( 'Your payment reference has been generated. The form will be confirmed automatically once ifthenpay receives the payment — you can close this page in the meantime.', 'ifthenpay-payments-for-gravityforms' ),
 			],
 			'failed'    => [
 				'variant' => 'error',
-				'icon'    => 'circle-error',
+				'svg'     => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" width="20" height="20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/></svg>',
 				'title'   => __( 'Payment failed', 'ifthenpay-payments-for-gravityforms' ),
-				'body'    => __( 'Something went wrong at the payment gateway and your payment was not processed. Please submit the form again to retry.', 'ifthenpay-payments-for-gravityforms' ),
+				'body'    => __( 'Something went wrong! Your payment was not processed. Please submit the form again to retry.', 'ifthenpay-payments-for-gravityforms' ),
 			],
 			'cancelled' => [
 				'variant' => 'cancel',
-				'icon'    => 'circle-notice-fine',
+				'svg'     => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" width="20" height="20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>',
 				'title'   => __( 'Payment cancelled', 'ifthenpay-payments-for-gravityforms' ),
 				'body'    => __( 'You cancelled the payment before it was completed. Submit the form again if you want to try a different method.', 'ifthenpay-payments-for-gravityforms' ),
 			],
@@ -1128,48 +1190,33 @@ class Addon extends \GFPaymentAddOn {
 			return $form_string;
 		}
 
-		$b          = $banners[ $status ];
-		$icon_span  = sprintf(
-			'<span class="gform-icon gform-icon--%s iftp-gf-return-notice__icon" aria-hidden="true"></span>',
-			esc_attr( $b['icon'] )
+		$b         = $banners[ $status ];
+		$icon_span = '<span class="iftp-gf-return-notice__icon" aria-hidden="true">' . $b['svg'] . '</span>';
+
+		$role = in_array( $b['variant'], [ 'error', 'cancel' ], true ) ? 'alert' : 'status';
+		$live = in_array( $b['variant'], [ 'error', 'cancel' ], true ) ? 'assertive' : 'polite';
+
+		$banner = sprintf(
+			'<div class="iftp-gf-return-notice iftp-gf-return-notice--%1$s" role="%5$s" aria-live="%6$s" tabindex="-1">'
+			. '%2$s'
+			. '<div class="iftp-gf-return-notice__text"><strong class="iftp-gf-return-notice__title">%3$s</strong><p class="iftp-gf-return-notice__body">%4$s</p></div>'
+			. '</div>',
+			esc_attr( $b['variant'] ),
+			$icon_span,
+			esc_html( $b['title'] ),
+			esc_html( $b['body'] ),
+			$role,
+			$live
 		);
-
-		if ( in_array( $b['variant'], [ 'error', 'cancel' ], true ) ) {
-
-			$banner = sprintf(
-				'<div class="gform_validation_errors gform-theme__no-reset--children iftp-gf-return-notice iftp-gf-return-notice--%1$s" role="alert" aria-live="assertive">'
-				. '<h2 class="gform_submission_error">%2$s%3$s</h2>'
-				. '<p class="iftp-gf-return-notice__body">%4$s</p>'
-				. '</div>',
-				esc_attr( $b['variant'] ),
-				$icon_span,
-				esc_html( $b['title'] ),
-				esc_html( $b['body'] )
-			);
-		} else {
-
-			$banner = sprintf(
-				'<div class="gform_confirmation_wrapper gform-theme__no-reset--children iftp-gf-return-notice iftp-gf-return-notice--%1$s" role="status" aria-live="polite">'
-				. '<div class="gform_confirmation_message">%2$s<div class="iftp-gf-return-notice__text"><strong>%3$s</strong><span>%4$s</span></div></div>'
-				. '</div>',
-				esc_attr( $b['variant'] ),
-				$icon_span,
-				esc_html( $b['title'] ),
-				esc_html( $b['body'] )
-			);
-		}
 
 		return $banner . $form_string;
 	}
 
 
 
-	public function handle_gateway_callback(): void {
-		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- server-to-server callback validated by entry-meta crosscheck
-		$_GET = wp_unslash($_GET);
-		if ( empty( $_GET['iftp_gf_callback'] ) ) {
-			return;
-		}
+	// phpcs:disable WordPress.Security.NonceVerification.Recommended -- server-to-server callback validated by entry-meta crosscheck
+	public function callback() {
+		$_GET = wp_unslash( $_GET );
 
 		$request_method = isset( $_SERVER['REQUEST_METHOD'] )
 			? strtoupper( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) )
@@ -1179,7 +1226,7 @@ class Addon extends \GFPaymentAddOn {
 			exit( 'Method Not Allowed' );
 		}
 
-		$ref = isset( $_GET['ref'] ) ? absint( wp_unslash( $_GET['ref'] ) ) : 0;
+		$ref = isset( $_GET['ref'] ) ? absint( $_GET['ref'] ) : 0;
 		if ( $ref <= 0 ) {
 			status_header( 400 );
 			exit( 'Missing ref' );
@@ -1190,6 +1237,40 @@ class Addon extends \GFPaymentAddOn {
 			status_header( 404 );
 			exit( 'Entry not found' );
 		}
+
+		/* TEST STARTS HERE
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG && isset( $_GET['force'] ) && current_user_can( 'manage_options' ) ) {
+			$existing = (string) gform_get_meta( $ref, 'iftp_gf_payment_status' );
+			if ( in_array( $existing, [ 'paid', 'failed', 'cancelled' ], true ) ) {
+				status_header( 200 );
+				exit( 'Payment already processed (Payed, Failed or Cancelled)!' );
+			}
+
+			$amount = (float) gform_get_meta( $ref, 'iftp_gf_payment_amount' );
+			$fail   = isset( $_GET['fail'] ) ? sanitize_text_field( (string) $_GET['fail'] ) : '';
+
+			if ( in_array( $fail, [ 'cancelled', 'error' ], true ) ) {
+				return [
+					'type'           => 'fail_payment',
+					'entry_id'       => $ref,
+					'amount'         => $amount,
+					'transaction_id' => '',
+					'payment_status' => $fail === 'cancelled' ? 'Cancelled' : 'Failed',
+					'note'           => '[TEST] ' . ( $fail === 'cancelled' ? 'Cancelled' : 'Failed' ) . ' by force param.',
+				];
+			}
+
+			return [
+				'type'             => 'complete_payment',
+				'entry_id'         => $ref,
+				'amount'           => $amount,
+				'transaction_id'   => 'TEST_' . time(),
+				'payment_method'   => sanitize_text_field( (string) ( $_GET['method'] ?? 'MB' ) ),
+				'payment_date'     => gmdate( 'Y-m-d H:i:s' ),
+				'transaction_type' => 'payment',
+			];
+		}
+		/* TEST ENDS HERE */
 
 
 		if ( ! empty( $_GET['status'] ) ) {
@@ -1205,37 +1286,34 @@ class Addon extends \GFPaymentAddOn {
 				exit( 'OK (idempotent)' );
 			}
 
-			if ( $status === 'cancelled' ) {
-				\GFAPI::update_entry_property( $ref, 'payment_status', 'Cancelled' );
-				$this->add_note( $ref, esc_html__( 'Payment cancelled at the ifthenpay gateway (server-side callback).', 'ifthenpay-payments-for-gravityforms' ), 'error' );
-				gform_update_meta( $ref, 'iftp_gf_payment_status', 'cancelled' );
-			} else {
-				$amount = (float) gform_get_meta( $ref, 'iftp_gf_payment_amount' );
-				$this->fail_payment( $entry, [
-					'transaction_id' => (string) gform_get_meta( $ref, 'iftp_gf_transaction_id' ),
-					'amount'         => $amount,
-					'type'           => 'fail_payment',
-				] );
-				gform_update_meta( $ref, 'iftp_gf_payment_status', 'failed' );
-			}
-			$this->cancel_expiry_check( $ref );
+			$amount = (float) gform_get_meta( $ref, 'iftp_gf_payment_amount' );
+			$txid   = (string) gform_get_meta( $ref, 'iftp_gf_transaction_id' );
 
-			status_header( 200 );
-			exit( 'OK' );
+			return [
+				'type'           => 'fail_payment',
+				'entry_id'       => $ref,
+				'amount'         => $amount,
+				'transaction_id' => $txid,
+				'payment_status' => $status === 'cancelled' ? 'Cancelled' : 'Failed',
+				'note'           => $status === 'cancelled'
+					? esc_html__( 'Payment cancelled at the ifthenpay gateway (server-side callback).', 'ifthenpay-payments-for-gravityforms' )
+					: esc_html__( 'Payment failed at the ifthenpay gateway (server-side callback).', 'ifthenpay-payments-for-gravityforms' ),
+			];
 		}
 
 
 		foreach ( [ 'apk', 'val', 'mtd', 'req' ] as $required ) {
 			if ( ! isset( $_GET[ $required ] ) ) {
 				status_header( 400 );
-				exit( 'Missing ' . esc_html($required) );
+				exit( 'Missing ' . esc_html( $required ) );
 			}
 		}
-
-		$apk = sanitize_text_field( wp_unslash( (string) ( $_GET['apk'] ?? '' ) ) );
-		$val = sanitize_text_field( wp_unslash( (string) ( $_GET['val'] ?? '' ) ) );
-		$mtd = sanitize_text_field( wp_unslash( (string) ( $_GET['mtd'] ?? '' ) ) );
-		$req = sanitize_text_field( wp_unslash( (string) ( $_GET['req'] ?? '' ) ) );
+		// phpcs:Disable WordPress.Security.ValidatedSanitizedInput.InputNotValidated -- validated by entry-meta crosscheck and strict format checks below + validated again in complete_payment() before marking paid
+		$apk = sanitize_text_field( (string) wp_unslash($_GET['apk'] ) );
+		$val = sanitize_text_field( (string) wp_unslash($_GET['val'] ) );
+		$mtd = sanitize_text_field( (string) wp_unslash($_GET['mtd'] ) );
+		$req = sanitize_text_field( (string) wp_unslash($_GET['req'] ) );
+		// phpcs:enable WordPress.Security.ValidatedSanitizedInput.InputNotValidated -- validated by entry-meta crosscheck and strict format checks below + validated again in complete_payment() before marking paid
 
 
 		$decoded_apk      = trim( (string) base64_decode( $apk, true ) );
@@ -1266,19 +1344,35 @@ class Addon extends \GFPaymentAddOn {
 			exit( 'OK (already paid)' );
 		}
 
-		$this->complete_payment( $entry, [
-			'transaction_id'   => $req,
-			'amount'           => $expected_amount,
-			'payment_method'   => $mtd,
-			'payment_date'     => gmdate( 'y-m-d H:i:s' ),
-			'transaction_type' => 'payment',
+		return [
 			'type'             => 'complete_payment',
-		] );
-		gform_update_meta( $ref, 'iftp_gf_payment_status', 'paid' );
-		$this->cancel_expiry_check( $ref );
+			'entry_id'         => $ref,
+			'amount'           => $expected_amount,
+			'transaction_id'   => $req,
+			'payment_method'   => $mtd,
+			'payment_date'     => gmdate( 'Y-m-d H:i:s' ),
+			'transaction_type' => 'payment',
+		];
+	}
+	// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
-		status_header( 200 );
-		exit( 'OK' );
+	public function post_callback( $callback_action, $result ): void {
+		if ( ! is_array( $callback_action ) || ! $result ) {
+			return;
+		}
+
+		$entry_id = (int) rgar( $callback_action, 'entry_id' );
+		if ( $entry_id <= 0 ) {
+			return;
+		}
+
+		$type = (string) rgar( $callback_action, 'type' );
+		if ( $type === 'complete_payment' ) {
+			gform_update_meta( $entry_id, 'iftp_gf_payment_status', 'paid' );
+		} elseif ( $type === 'fail_payment' ) {
+			$ps = strtolower( (string) rgar( $callback_action, 'payment_status', 'Failed' ) );
+			gform_update_meta( $entry_id, 'iftp_gf_payment_status', $ps === 'cancelled' ? 'cancelled' : 'failed' );
+		}
 	}
 
 
@@ -1290,8 +1384,6 @@ class Addon extends \GFPaymentAddOn {
 		}
 
 		$entry_id = (int) ( $return_data['entry_id'] ?? 0 );
-		$status   = IfthenpayReturn::get_return_status( $return_data );
-
 		if ( $entry_id <= 0 ) {
 			return;
 		}
@@ -1308,71 +1400,15 @@ class Addon extends \GFPaymentAddOn {
 			return;
 		}
 
-		$context = IfthenpayReturn::resolve_return_context( $return_data );
-
-		$amount = (float) rgar( $entry, 'payment_amount' );
-		if ( $amount <= 0 ) {
-			$amount = (float) gform_get_meta( $entry_id, 'iftp_gf_payment_amount' );
-		}
-
-		$flash = '';
-
-		if ( $status === 'success' ) {
-			$tx = (string) ( $return_data['transaction_id'] ?? '' );
-
-			$verified = null;
-			if ( $tx !== '' ) {
-				try {
-					$verified = IfthenpayClient::verify_transaction_paid( $tx );
-				} catch ( \RuntimeException ) {
-				}
-			}
-
-			if ( is_array( $verified ) ) {
-				$api_method = (string) ( $verified['PaymentMethod'] ?? $verified['paymentMethod'] ?? '' );
-				$method     = $api_method !== '' ? $api_method : (string) ( $context['payment_method'] ?? '' );
-
-				$this->complete_payment( $entry, [
-					'transaction_id'   => (string) ( $verified['TransactionId'] ?? $verified['transactionId'] ?? $tx ),
-					'amount'           => $amount,
-					'payment_method'   => $method,
-					'payment_date'     => gmdate( 'y-m-d H:i:s' ),
-					'transaction_type' => 'payment',
-					'type'             => 'complete_payment',
-				] );
-				gform_update_meta( $entry_id, 'iftp_gf_payment_status', 'paid' );
-				$flash = 'paid';
-			} else {
-
-				$this->fail_payment( $entry, [
-					'transaction_id' => $tx,
-					'amount'         => $amount,
-					'type'           => 'fail_payment',
-				] );
-				gform_update_meta( $entry_id, 'iftp_gf_payment_status', 'failed' );
-				$flash = 'failed';
-			}
-		} elseif ( in_array( $status, [ 'cancel', 'cancelled', 'canceled' ], true ) ) {
-			\GFAPI::update_entry_property( $entry_id, 'payment_status', 'Cancelled' );
-			$this->add_note( $entry_id, esc_html__( 'Payment cancelled by the customer at the ifthenpay gateway.', 'ifthenpay-payments-for-gravityforms' ), 'error' );
-			gform_update_meta( $entry_id, 'iftp_gf_payment_status', 'cancelled' );
-			$flash = 'cancelled';
-			$this->log_debug( __METHOD__ . "(): Entry #{$entry_id} marked Cancelled." );
-		} elseif ( $status === 'error' ) {
-			$this->fail_payment( $entry, [
-				'transaction_id' => $context['transaction_id'] ?? '',
-				'amount'         => $amount,
-				'type'           => 'fail_payment',
-			] );
-			gform_update_meta( $entry_id, 'iftp_gf_payment_status', 'failed' );
-			$flash = 'failed';
-			$this->log_debug( __METHOD__ . "(): Entry #{$entry_id} → fail_payment()." );
-		}
+		$status = IfthenpayReturn::get_return_status( $return_data );
 
 
-		if ( $flash !== '' ) {
-			$this->cancel_expiry_check( $entry_id );
-		}
+		$flash = match ( true ) {
+			$status === 'success'                                              => 'pending',
+			in_array( $status, [ 'cancel', 'cancelled', 'canceled' ], true ) => 'cancelled',
+			$status === 'error'                                                => 'failed',
+			default                                                            => '',
+		};
 
 		$this->redirect_after_return( $entry, $flash );
 	}
@@ -1400,194 +1436,6 @@ class Addon extends \GFPaymentAddOn {
 
 
 
-	/**
-	 * Inline WP-Cron fallback — hooked to `wp` at priority 20.
-	 *
-	 * WP-Cron works by spawning an async loopback HTTP request. In environments
-	 * where that loopback fails (localhost, Docker, some hosts), scheduled events
-	 * pile up and never run. This method reads the cron queue directly and
-	 * processes any overdue `iftp_gf_expire_pending_payment` events in-process,
-	 * then removes them from the queue so WP-Cron doesn't double-run them.
-	 *
-	 * Throttled to once per minute via a transient so it costs nothing on busy
-	 * sites where WP-Cron is already running normally.
-	 */
-	public function maybe_process_overdue_payments(): void {
-		if ( get_transient( 'iftp_gf_expiry_fallback' ) ) {
-			return;
-		}
-		set_transient( 'iftp_gf_expiry_fallback', 1, MINUTE_IN_SECONDS );
-
-		$crons = _get_cron_array();
-		if ( ! is_array( $crons ) || empty( $crons ) ) {
-			return;
-		}
-
-		$now = time();
-		foreach ( $crons as $timestamp => $hooks ) {
-			if ( $timestamp > $now ) {
-				break;
-			}
-			if ( ! isset( $hooks['iftp_gf_expire_pending_payment'] ) ) {
-				continue;
-			}
-			foreach ( $hooks['iftp_gf_expire_pending_payment'] as $event ) {
-				$entry_id = (int) ( $event['args'][0] ?? 0 );
-				if ( $entry_id <= 0 ) {
-					continue;
-				}
-				$this->log_debug( sprintf(
-					'%s(): Cron fallback — running expiry check for entry #%d (was due %s).',
-					__METHOD__,
-					$entry_id,
-					gmdate( 'Y-m-d H:i:s', $timestamp )
-				) );
-				$this->expire_pending_payment( $entry_id );
-				wp_unschedule_event( $timestamp, 'iftp_gf_expire_pending_payment', $event['args'] );
-			}
-		}
-	}
-
-	/**
-	 * Schedules a single expiry-check event for the given entry.
-	 *
-	 * Uses Action Scheduler when available (WooCommerce, etc.) for visibility
-	 * in Tools → Scheduled Actions; falls back to WP-Cron otherwise.
-	 * Delay is filterable via `iftp_gf_payment_expiry_seconds` (default 24 h).
-	 */
-	private function schedule_expiry_check( int $entry_id ): void {
-		$delay   = (int) apply_filters( 'iftp_gf_payment_expiry_seconds', 86400 );
-		$fire_at = time() + $delay;
-
-		if ( function_exists( 'as_schedule_single_action' ) ) {
-			as_schedule_single_action(
-				$fire_at,
-				'iftp_gf_expire_pending_payment',
-				[ 'entry_id' => $entry_id ],
-				'iftp-gf'
-			);
-		} else {
-			wp_schedule_single_event(
-				$fire_at,
-				'iftp_gf_expire_pending_payment',
-				[ $entry_id ]
-			);
-		}
-
-		$this->log_debug( sprintf(
-			'%s(): Expiry check scheduled for entry #%d in %d s.',
-			__METHOD__, $entry_id, $delay
-		) );
-	}
-
-	/**
-	 * Cancels any pending expiry-check for the given entry (called as soon as
-	 * the payment reaches a terminal status via webhook or gateway return).
-	 */
-	private function cancel_expiry_check( int $entry_id ): void {
-
-		wp_clear_scheduled_hook( 'iftp_gf_expire_pending_payment', [ $entry_id ] );
-
-		if ( function_exists( 'as_unschedule_action' ) ) {
-			as_unschedule_action(
-				'iftp_gf_expire_pending_payment',
-				[ 'entry_id' => $entry_id ],
-				'iftp-gf'
-			);
-		}
-
-		$this->log_debug( sprintf(
-			'%s(): Expiry check cancelled for entry #%d.',
-			__METHOD__, $entry_id
-		) );
-	}
-
-	/**
-	 * Fires when the pay-link expiry window closes (hooked to
-	 * `iftp_gf_expire_pending_payment` via both WP-Cron and Action Scheduler).
-	 *
-	 * Flow:
-	 *  1. If the entry is no longer `pending` the webhook already handled it — exit.
-	 *  2. Call verify_transaction_paid() as a safety net; if the API confirms
-	 *     payment the webhook must have been dropped — complete the entry now.
-	 *  3. If the API confirms no payment, mark the entry Failed and add a note.
-	 *  4. On API error (gateway unreachable) do nothing so the entry stays pending
-	 *     for manual review rather than being incorrectly expired.
-	 *
-	 * @param int|string $entry_id Passed positionally by both WP-Cron and AS.
-	 */
-	public function expire_pending_payment( $entry_id ): void {
-		$entry_id = (int) $entry_id;
-
-		$entry = \GFAPI::get_entry( $entry_id );
-		if ( is_wp_error( $entry ) || ! is_array( $entry ) ) {
-			$this->log_error( __METHOD__ . "(): Entry #{$entry_id} not found during expiry check." );
-			return;
-		}
-
-		$current = (string) gform_get_meta( $entry_id, 'iftp_gf_payment_status' );
-		if ( $current !== 'pending' ) {
-			$this->log_debug( sprintf(
-				'%s(): Entry #%d already resolved (status=%s) — skipping.',
-				__METHOD__, $entry_id, $current
-			) );
-			return;
-		}
-
-		$transaction_id = (string) gform_get_meta( $entry_id, 'iftp_gf_transaction_id' );
-		$amount         = (float)  gform_get_meta( $entry_id, 'iftp_gf_payment_amount' );
-
-
-		if ( $transaction_id !== '' ) {
-			try {
-				$verified = IfthenpayClient::verify_transaction_paid( $transaction_id );
-			} catch ( \RuntimeException $e ) {
-
-				$this->log_error( sprintf(
-					'%s(): API error for entry #%d during expiry check: %s',
-					__METHOD__, $entry_id, $e->getMessage()
-				) );
-				return;
-			}
-
-			if ( is_array( $verified ) ) {
-
-				$this->complete_payment( $entry, [
-					'transaction_id'   => (string) ( $verified['TransactionId'] ?? $verified['transactionId'] ?? $transaction_id ),
-					'amount'           => $amount,
-					'payment_method'   => (string) ( $verified['PaymentMethod'] ?? $verified['paymentMethod'] ?? '' ),
-					'payment_date'     => gmdate( 'Y-m-d H:i:s' ),
-					'transaction_type' => 'payment',
-					'type'             => 'complete_payment',
-				] );
-				gform_update_meta( $entry_id, 'iftp_gf_payment_status', 'paid' );
-				$this->add_note(
-					$entry_id,
-					esc_html__( 'Payment confirmed by expiry safety-net check — webhook was not received. Entry marked Paid.', 'ifthenpay-payments-for-gravityforms' ),
-					'success'
-				);
-				$this->log_debug( __METHOD__ . "(): Entry #{$entry_id} recovered via safety-net — marked Paid." );
-				return;
-			}
-		}
-
-
-		$this->fail_payment( $entry, [
-			'transaction_id' => $transaction_id,
-			'amount'         => $amount,
-			'type'           => 'fail_payment',
-		] );
-		gform_update_meta( $entry_id, 'iftp_gf_payment_status', 'failed' );
-		$this->add_note(
-			$entry_id,
-			esc_html__( 'Payment reference expired with no payment received. Entry marked Failed.', 'ifthenpay-payments-for-gravityforms' ),
-			'error'
-		);
-		$this->log_debug( __METHOD__ . "(): Entry #{$entry_id} expired — marked Failed." );
-	}
-
-
-
 	public function ajax_connect_backoffice(): void {
 		check_ajax_referer( 'iftp_gf_admin', 'nonce' );
 
@@ -1609,7 +1457,7 @@ class Addon extends \GFPaymentAddOn {
 
 
 		try {
-			$gateway_rows = ( new IfthenpayClient( $backoffice_key ) )->get_gateway_keys( self::GATEWAY_TYPE );
+			$gateway_rows = ( new IfthenpayClient( $backoffice_key ) )->get_gateway_keys();
 		} catch ( \Throwable ) {
 			$gateway_rows = [];
 		}
@@ -1617,10 +1465,7 @@ class Addon extends \GFPaymentAddOn {
 		if ( empty( $gateway_rows ) ) {
 			wp_send_json_error( [
 				'message' => sprintf(
-					/* translators: 1: support email link, 2: sign-up link */
-					__( 'No gateway found for this backoffice key. If you are a client, %1$s to request one. Otherwise, %2$s.', 'ifthenpay-payments-for-gravityforms' ),
-					'<a href="mailto:suporte@ifthenpay.com">' . esc_html__( 'contact support', 'ifthenpay-payments-for-gravityforms' ) . '</a>',
-					'<a href="' . esc_url( self::SIGNUP_URL ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'sign up here', 'ifthenpay-payments-for-gravityforms' ) . '</a>'
+					__( 'No gateway found for this backoffice key. If you are a client, request one. Otherwise, contact Ifthenpay to become one.', 'ifthenpay-payments-for-gravityforms' ),
 				),
 			], 400 );
 		}
@@ -1774,7 +1619,7 @@ class Addon extends \GFPaymentAddOn {
 		}
 
 		try {
-			$rows = ( new IfthenpayClient( $backoffice_key ) )->get_gateway_keys( self::GATEWAY_TYPE );
+			$rows = ( new IfthenpayClient( $backoffice_key ) )->get_gateway_keys();
 		} catch ( \Throwable $e ) {
 			$this->log_error( __METHOD__ . '(): ' . $e->getMessage() );
 			$rows = [];

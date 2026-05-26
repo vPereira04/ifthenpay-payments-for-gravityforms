@@ -14,7 +14,10 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 final class FormPaymentInfo {
 
-	private const OPTION_PREFIX = 'ifthenpay_gf_form_';
+	private const OPTION_PREFIX      = 'ifthenpay_gf_form_';
+	private const FEED_OPTION_PREFIX = 'ifthenpay_gf_feed_';
+
+
 
 	public static function get( int $form_id ): array {
 		$data = get_option( self::OPTION_PREFIX . $form_id, [] );
@@ -29,17 +32,36 @@ final class FormPaymentInfo {
 		delete_option( self::OPTION_PREFIX . $form_id );
 	}
 
+
+
+	public static function get_for_feed( int $feed_id ): array {
+		$data = get_option( self::FEED_OPTION_PREFIX . $feed_id, [] );
+		return is_array( $data ) ? $data : [];
+	}
+
+	public static function save_for_feed( int $feed_id, array $data ): void {
+		update_option( self::FEED_OPTION_PREFIX . $feed_id, $data, false );
+	}
+
+	public static function delete_for_feed( int $feed_id ): void {
+		delete_option( self::FEED_OPTION_PREFIX . $feed_id );
+	}
+
+
+
 	/**
-	 * Bulk-delete all per-form snapshots (called on backoffice key disconnect).
+	 * Bulk-delete all per-form and per-feed snapshots.
 	 */
 	public static function delete_all(): void {
 		global $wpdb;
-		$wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$wpdb->prepare(
-				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
-				$wpdb->esc_like( self::OPTION_PREFIX ) . '%'
-			)
-		);
+		foreach ( [ self::OPTION_PREFIX, self::FEED_OPTION_PREFIX ] as $prefix ) {
+			$wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$wpdb->prepare(
+					"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
+					$wpdb->esc_like( $prefix ) . '%'
+				)
+			);
+		}
 	}
 
 	private function __construct() {}

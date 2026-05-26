@@ -243,23 +243,38 @@
 /* -------------------------------------------------------------------------
    Payment-status banner (returned from gateway with ?iftp_gf_status=...)
 
-   Error / cancel states use GF's native .gform_validation_errors structure —
-   GF's own theme CSS already handles red colouring and the icon font.
-   Success / info states use .gform_confirmation_wrapper with colour
-   overrides below; the icon is rendered by GF's gform-icon font.
+   All four states share the same layout — only colour, icon, and message
+   differ. Styled independently of GF's parent theme classes (.gform-theme--api
+   etc.) so the banner looks correct when prepended before the form element,
+   where those scoped CSS variables are not inherited.
    ------------------------------------------------------------------------- */
 
-/* Layout for confirmation-style (success / info) notices */
-.iftp-gf-return-notice .gform_confirmation_message {
+.iftp-gf-return-notice {
 	display: flex;
 	align-items: flex-start;
 	gap: 10px;
 	margin: 0 0 20px;
 	padding: 14px 16px;
 	border-radius: var(--gf-radius, 4px);
-	border: 1px solid transparent;
+	border-width: 1px;
+	border-style: solid;
+	font-family: var(--gf-font-family-primary, inherit);
 	font-size: var(--gf-font-size-secondary, 14px);
 	line-height: 1.5;
+}
+
+.iftp-gf-return-notice__icon {
+	flex-shrink: 0;
+	display: inline-flex;
+	width: 20px;
+	height: 20px;
+	margin-top: 1px;
+}
+
+.iftp-gf-return-notice__icon svg {
+	width: 20px;
+	height: 20px;
+	display: block;
 }
 
 .iftp-gf-return-notice__text {
@@ -268,16 +283,21 @@
 	gap: 3px;
 }
 
-/* Icon sizing — colour set per-variant below */
-.iftp-gf-return-notice__icon {
-	flex-shrink: 0;
-	font-size: 18px;
-	line-height: 1;
-	margin-top: 1px;
+.iftp-gf-return-notice__title {
+	font-weight: 500;
+	font-size: inherit;
+	line-height: inherit;
+}
+
+.iftp-gf-return-notice__body {
+	margin: 0;
+	font-size: inherit;
+	line-height: inherit;
+	opacity: 0.88;
 }
 
 /* success (paid) */
-.iftp-gf-return-notice--success .gform_confirmation_message {
+.iftp-gf-return-notice--success {
 	background: #ecfdf5;
 	border-color: #a7f3d0;
 	color: #065f46;
@@ -285,27 +305,48 @@
 .iftp-gf-return-notice--success .iftp-gf-return-notice__icon { color: #10b981; }
 
 /* info (pending) */
-.iftp-gf-return-notice--info .gform_confirmation_message {
+.iftp-gf-return-notice--info {
 	background: #eff6ff;
 	border-color: #bfdbfe;
 	color: #1e3a8a;
 }
 .iftp-gf-return-notice--info .iftp-gf-return-notice__icon { color: #3b82f6; }
 
-/* cancel — override GF's default red to amber/warning */
-.iftp-gf-return-notice--cancel.gform_validation_errors {
+/* error (failed) */
+.iftp-gf-return-notice--error {
+	background: #fef2f2;
+	border-color: #fca5a5;
+	color: #991b1b;
+}
+.iftp-gf-return-notice--error .iftp-gf-return-notice__icon { color: #dc2626; }
+
+/* cancel (cancelled) */
+.iftp-gf-return-notice--cancel {
 	background: #fffbeb;
 	border-color: #fde68a;
 	color: #92400e;
 }
 .iftp-gf-return-notice--cancel .iftp-gf-return-notice__icon { color: #f59e0b; }
 
-/* error — GF's gform_validation_errors already provides red styling */
-.iftp-gf-return-notice--error .iftp-gf-return-notice__icon { color: inherit; }
+/* Focus styles — visible outline matching each variant's accent colour */
+.iftp-gf-return-notice:focus { outline-offset: 2px; }
 
-/* Body paragraph inside error/cancel notices */
-.iftp-gf-return-notice__body {
-	margin: 6px 0 0;
-	font-size: var(--gf-font-size-tertiary, 13px);
-	opacity: 0.88;
+.iftp-gf-return-notice--success:focus {
+	border-color: #059669;
+	outline: 2px solid rgb(16 185 129 / 65%);
+}
+
+.iftp-gf-return-notice--info:focus {
+	border-color: #2563eb;
+	outline: 2px solid rgb(59 130 246 / 65%);
+}
+
+.iftp-gf-return-notice--error:focus {
+	border-color: #b91c1c;
+	outline: 2px solid rgb(220 38 38 / 65%);
+}
+
+.iftp-gf-return-notice--cancel:focus {
+	border-color: #d97706;
+	outline: 2px solid rgb(245 158 11 / 65%);
 }

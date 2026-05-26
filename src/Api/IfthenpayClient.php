@@ -18,7 +18,7 @@ use RuntimeException;
  *  2. get_gateway_keys('GravityForms') — every time the Feed Settings page renders.
  *  3. get_available_methods()     — every time the Feed Settings page renders.
  *  4. create_payment_link()       — when the customer clicks Submit on a form.
- *  5. verify_transaction_paid()   — when the customer returns from the gateway.
+ *  5. activate_callback()         — when a feed is saved, registering the webhook URL.
  *
  * No catalogs are cached. The per-form snapshot saved in
  * `ifthenpay_gf_form_{form_id}` is the only persistent piece of gateway data
@@ -65,7 +65,7 @@ final class IfthenpayClient {
 	 *
 	 * @return array<int, array<string, mixed>>
 	 */
-	public function get_gateway_keys( string $type = 'GravityForms' ): array {
+	public function get_gateway_keys( string $type = '' ): array {
 		$args = [ 'boKey' => $this->backoffice_key ];
 
 		$type = sanitize_text_field( $type );
@@ -111,37 +111,42 @@ final class IfthenpayClient {
 
 
 	/**
-	 * Authoritative "did the customer actually pay" check.
+	 * Registers the server-to-server callback URL for a gateway key.
 	 *
-	 * Hits GET /gateway/transaction/status/get?transactionId=...
-	 *  • 200 OK  → returns the body, e.g. ['TransactionId' => '…', 'PaymentMethod' => '...']
-	 *  • 404 Not Found → returns null (reference exists but payment NOT received yet)
-	 *  • other HTTP errors → re-throws RuntimeException
+	 * POSTs to the ifthenpay activation endpoint so the platform knows where
+	 * to deliver payment notifications. The urlCb template includes API
+	 * placeholders that ifthenpay fills in when firing each callback:
+	 *  [ORDER_ID]          → entry ID (the `id` field from the pay-by-link payload)
+	 *  [ANTI_PHISHING_KEY] → base64-encoded gateway key (used to validate authenticity)
+	 *  [AMOUNT]            → payment amount
+	 *  [PAYMENT_METHOD]    → method used (MB, MBWAY, CCARD, …)
+	 *  [REQUEST_ID]        → ifthenpay transaction reference
 	 *
-	 * The success-URL redirect alone is unreliable for asynchronous methods
-	 * (Multibanco, Payshop) because the customer can be redirected back after
-	 * merely *generating* the reference.
-	 *
-	 * @return array<string, mixed>|null
+	 * Returns true when the API responds with "OK", false otherwise.
+	 * Throws RuntimeException only on transport / non-2xx errors.
 	 */
-	public static function verify_transaction_paid( string $transaction_id ): ?array {
-		$transaction_id = sanitize_text_field( trim( $transaction_id ) );
-		if ( $transaction_id === '' ) {
-			return null;
-		}
+	public static function activate_callback( string $gateway_key, string $base_callback_url ): bool {
+		$url = self::API_BASE . '/endpoint/callback/activation/?cms=moodle';
 
-		$url = add_query_arg(
-			[ 'transactionId' => $transaction_id ],
-			self::API_BASE . '/gateway/transaction/status/get'
-		);
+		$payload = [
+			'apKey' => base64_encode( $gateway_key ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+			'chave' => $gateway_key,
+			'urlCb' => $base_callback_url
+				. '&ref=[ORDER_ID]&apk=[ANTI_PHISHING_KEY]&val=[AMOUNT]&mtd=[PAYMENT_METHOD]&req=[REQUEST_ID]',
+		];
 
 		try {
-			return self::request( 'GET', $url );
-		} catch ( RuntimeException $e ) {
-			if ( (int) $e->getCode() === 404 ) {
-				return null;
-			}
-			throw $e;
+			$res = self::request(
+				'POST',
+				$url,
+				[
+					'headers' => [ 'Content-Type' => 'application/json' ],
+					'body'    => wp_json_encode( $payload ),
+				]
+			);
+			return (string) ( $res['data'] ?? '' ) === 'OK';
+		} catch ( RuntimeException ) {
+			return false;
 		}
 	}
 
