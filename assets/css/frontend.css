@@ -1,5 +1,36 @@
 /* ifthenpay | Payments for Gravity Forms — Frontend Field Styles */
 
+/* ---- Icon font ---- */
+@font-face {
+  font-family: ifthenpay-icons;
+  src: url('../fonts/ifthenpay-icons.woff2') format('woff2'),
+       url('../fonts/ifthenpay-icons.woff') format('woff'),
+       url('../fonts/ifthenpay-icons.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+
+.iftp-gf-field-icon {
+  font-family: ifthenpay-icons;
+  font-style: normal;
+  font-weight: 100;
+  font-size: 22px;
+  color: rgb(0, 96, 156);
+  line-height: 1;
+  display: inline-block;
+}
+
+.iftp-gf-field-icon::before {
+  content: "\e002";
+}
+
+@media (prefers-color-scheme: dark) {
+  .iftp-gf-field-icon {
+    color: #F6F9FC;
+  }
+}
+
 /* ---- Box-sizing reset for the field ---- */
 .gfield--type-iftp_pbl,
 .gfield--type-iftp_pbl * {

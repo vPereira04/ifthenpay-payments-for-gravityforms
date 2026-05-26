@@ -25,7 +25,7 @@ class GF_Field_Ifthenpay extends \GF_Field {
 	}
 
 	public function get_form_editor_field_icon(): string {
-		return \IFTP_GF_URL . 'assets/images/ifthenpay-small-icon.svg';
+		return 'gform-icon--ifthenpay';
 	}
 
 	public function get_form_editor_button(): array {
@@ -114,7 +114,7 @@ class GF_Field_Ifthenpay extends \GF_Field {
 				<!-- Header -->
 				<div class="iftp-gf-box__header">
 					<span class="iftp-gf-box__header-icon" aria-hidden="true">
-						<img src="<?php echo esc_url( \IFTP_GF_URL . 'assets/images/ifthenpay-field-icon.svg' ); ?>" alt="Ifthenpay" width="50" height="50">
+						<i class="iftp-gf-field-icon"></i>
 					</span>
 					<div class="iftp-gf-box__header-text">
 						<div class="iftp-gf-box__header-title">ifthenpay</div>
@@ -192,7 +192,7 @@ class GF_Field_Ifthenpay extends \GF_Field {
 			<div class="iftp-gf-box">
 				<div class="iftp-gf-box__header">
 					<span class="iftp-gf-box__header-icon" aria-hidden="true">
-						<img src="<?php echo esc_url( \IFTP_GF_URL . 'assets/images/ifthenpay-field-icon.svg' ); ?>" alt="Ifthenpay" width="22" height="22">
+						<i class="iftp-gf-field-icon"></i>
 					</span>
 					<div class="iftp-gf-box__header-text">
 						<div class="iftp-gf-box__header-title">ifthenpay</div>

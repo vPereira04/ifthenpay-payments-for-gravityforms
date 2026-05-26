@@ -1238,6 +1238,41 @@ class Addon extends \GFPaymentAddOn {
 			exit( 'Entry not found' );
 		}
 
+		/* TEST STARTS HERE
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG && isset( $_GET['force'] ) && current_user_can( 'manage_options' ) ) {
+			$existing = (string) gform_get_meta( $ref, 'iftp_gf_payment_status' );
+			if ( in_array( $existing, [ 'paid', 'failed', 'cancelled' ], true ) ) {
+				status_header( 200 );
+				exit( 'Payment already processed (Payed, Failed or Cancelled)!' );
+			}
+
+			$amount = (float) gform_get_meta( $ref, 'iftp_gf_payment_amount' );
+			$fail   = isset( $_GET['fail'] ) ? sanitize_text_field( (string) $_GET['fail'] ) : '';
+
+			if ( in_array( $fail, [ 'cancelled', 'error' ], true ) ) {
+				return [
+					'type'           => 'fail_payment',
+					'entry_id'       => $ref,
+					'amount'         => $amount,
+					'transaction_id' => '',
+					'payment_status' => $fail === 'cancelled' ? 'Cancelled' : 'Failed',
+					'note'           => '[TEST] ' . ( $fail === 'cancelled' ? 'Cancelled' : 'Failed' ) . ' by force param.',
+				];
+			}
+
+			return [
+				'type'             => 'complete_payment',
+				'entry_id'         => $ref,
+				'amount'           => $amount,
+				'transaction_id'   => 'TEST_' . time(),
+				'payment_method'   => sanitize_text_field( (string) ( $_GET['method'] ?? 'MB' ) ),
+				'payment_date'     => gmdate( 'Y-m-d H:i:s' ),
+				'transaction_type' => 'payment',
+			];
+		}
+		/* TEST ENDS HERE */
+
+
 		if ( ! empty( $_GET['status'] ) ) {
 			$status = sanitize_text_field( wp_unslash( (string) $_GET['status'] ) );
 			if ( ! in_array( $status, [ 'cancelled', 'error' ], true ) ) {
@@ -1422,7 +1457,7 @@ class Addon extends \GFPaymentAddOn {
 
 
 		try {
-			$gateway_rows = ( new IfthenpayClient( $backoffice_key ) )->get_gateway_keys( self::GATEWAY_TYPE );
+			$gateway_rows = ( new IfthenpayClient( $backoffice_key ) )->get_gateway_keys();
 		} catch ( \Throwable ) {
 			$gateway_rows = [];
 		}
@@ -1584,7 +1619,7 @@ class Addon extends \GFPaymentAddOn {
 		}
 
 		try {
-			$rows = ( new IfthenpayClient( $backoffice_key ) )->get_gateway_keys( self::GATEWAY_TYPE );
+			$rows = ( new IfthenpayClient( $backoffice_key ) )->get_gateway_keys();
 		} catch ( \Throwable $e ) {
 			$this->log_error( __METHOD__ . '(): ' . $e->getMessage() );
 			$rows = [];

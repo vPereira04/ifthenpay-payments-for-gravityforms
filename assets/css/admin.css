@@ -240,7 +240,7 @@ select option:disabled {
 
 @font-face {
   font-family: ifthenpay-icons;
-  src: url('../fonts/ifthenpay-icons.eot') format('eot'),
+  src: url('../fonts/ifthenpay-icons.woff2') format('woff2'),
        url('../fonts/ifthenpay-icons.woff') format('woff'),
        url('../fonts/ifthenpay-icons.ttf') format('truetype');
   font-weight: normal;
@@ -254,5 +254,25 @@ select option:disabled {
 }
 
 .gform-icon--ifthenpay::before {
-  content: "\e002"; /* o unicode que o IcoMoon te der */
+  content: "\e002";
+}
+
+.iftp-gf-field-icon {
+  font-family: ifthenpay-icons;
+  font-style: normal;
+  font-weight: 100;
+  font-size: 22px;
+  color: rgb(0, 96, 156);
+  line-height: 1;
+  display: inline-block;
+}
+
+.iftp-gf-field-icon::before {
+  content: "\e002";
+}
+
+@media (prefers-color-scheme: dark) {
+  .iftp-gf-field-icon {
+    color: #F6F9FC;
+  }
 }
