@@ -65,7 +65,7 @@ final class IfthenpayClient {
 	 *
 	 * @return array<int, array<string, mixed>>
 	 */
-	public function get_gateway_keys( string $type = '' ): array {
+	public function get_gateway_keys( string $type = 'GravityForms' ): array {
 		$args = [ 'boKey' => $this->backoffice_key ];
 
 		$type = sanitize_text_field( $type );

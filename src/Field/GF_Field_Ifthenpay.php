@@ -40,6 +40,7 @@ class GF_Field_Ifthenpay extends \GF_Field {
 			'label_setting',
 			'description_setting',
 			'css_class_setting',
+			'conditional_logic_field_setting',
 		];
 	}
 

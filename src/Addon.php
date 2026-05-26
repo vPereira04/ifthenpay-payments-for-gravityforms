@@ -834,6 +834,17 @@ class Addon extends \GFPaymentAddOn {
 		$entry_id = (int) rgar( $entry, 'id' );
 
 
+		foreach ( $form['fields'] ?? [] as $field ) {
+			if ( isset( $field->type ) && $field->type === 'iftp_pbl' ) {
+				if ( \GFFormsModel::is_field_hidden( $form, $field, [], $entry ) ) {
+					$this->log_debug( __METHOD__ . '(): iftp_pbl field is hidden by conditional logic — skipping redirect.' );
+					return '';
+				}
+				break;
+			}
+		}
+
+
 		$competing = $this->get_competing_payment_addon_slugs( $form_id );
 		if ( ! empty( $competing ) ) {
 			$this->log_error( sprintf(
@@ -1045,6 +1056,17 @@ class Addon extends \GFPaymentAddOn {
 		}
 
 
+		$entry = \GFFormsModel::get_current_lead( $form );
+		foreach ( $form['fields'] ?? [] as $field ) {
+			if ( isset( $field->type ) && $field->type === 'iftp_pbl' ) {
+				if ( \GFFormsModel::is_field_hidden( $form, $field, [], $entry ) ) {
+					return $validation_result;
+				}
+				break;
+			}
+		}
+
+
 		if ( self::get_backoffice_key() === '' ) {
 			return $this->fail_validation_on_field(
 				$validation_result,
@@ -1238,39 +1260,7 @@ class Addon extends \GFPaymentAddOn {
 			exit( 'Entry not found' );
 		}
 
-		/* TEST STARTS HERE
-		if ( defined( 'WP_DEBUG' ) && WP_DEBUG && isset( $_GET['force'] ) && current_user_can( 'manage_options' ) ) {
-			$existing = (string) gform_get_meta( $ref, 'iftp_gf_payment_status' );
-			if ( in_array( $existing, [ 'paid', 'failed', 'cancelled' ], true ) ) {
-				status_header( 200 );
-				exit( 'Payment already processed (Payed, Failed or Cancelled)!' );
-			}
 
-			$amount = (float) gform_get_meta( $ref, 'iftp_gf_payment_amount' );
-			$fail   = isset( $_GET['fail'] ) ? sanitize_text_field( (string) $_GET['fail'] ) : '';
-
-			if ( in_array( $fail, [ 'cancelled', 'error' ], true ) ) {
-				return [
-					'type'           => 'fail_payment',
-					'entry_id'       => $ref,
-					'amount'         => $amount,
-					'transaction_id' => '',
-					'payment_status' => $fail === 'cancelled' ? 'Cancelled' : 'Failed',
-					'note'           => '[TEST] ' . ( $fail === 'cancelled' ? 'Cancelled' : 'Failed' ) . ' by force param.',
-				];
-			}
-
-			return [
-				'type'             => 'complete_payment',
-				'entry_id'         => $ref,
-				'amount'           => $amount,
-				'transaction_id'   => 'TEST_' . time(),
-				'payment_method'   => sanitize_text_field( (string) ( $_GET['method'] ?? 'MB' ) ),
-				'payment_date'     => gmdate( 'Y-m-d H:i:s' ),
-				'transaction_type' => 'payment',
-			];
-		}
-		/* TEST ENDS HERE */
 
 
 		if ( ! empty( $_GET['status'] ) ) {
@@ -1457,7 +1447,7 @@ class Addon extends \GFPaymentAddOn {
 
 
 		try {
-			$gateway_rows = ( new IfthenpayClient( $backoffice_key ) )->get_gateway_keys();
+			$gateway_rows = ( new IfthenpayClient( $backoffice_key ) )->get_gateway_keys(self::GATEWAY_TYPE);
 		} catch ( \Throwable ) {
 			$gateway_rows = [];
 		}
@@ -1619,7 +1609,7 @@ class Addon extends \GFPaymentAddOn {
 		}
 
 		try {
-			$rows = ( new IfthenpayClient( $backoffice_key ) )->get_gateway_keys();
+			$rows = ( new IfthenpayClient( $backoffice_key ) )->get_gateway_keys( self::GATEWAY_TYPE );
 		} catch ( \Throwable $e ) {
 			$this->log_error( __METHOD__ . '(): ' . $e->getMessage() );
 			$rows = [];
