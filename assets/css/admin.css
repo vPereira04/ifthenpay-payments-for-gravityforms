@@ -238,22 +238,21 @@ select option:disabled {
    Icons
    ------------------------------------------------------------------------- */
 
-.gform-icon.gform-icon--ifthenpay::before{
-    content: "";
-    font-family: initial;
-    display: inline-block;
-    width: 34px;
-    height: 34px;
-    background-image: url('../images/ifthenpay-icon.svg');
-    background-size: contain;
-    background-repeat: no-repeat;
+@font-face {
+  font-family: ifthenpay-icons;
+  src: url('../fonts/ifthenpay-icons.eot') format('eot'),
+       url('../fonts/ifthenpay-icons.woff') format('woff'),
+       url('../fonts/ifthenpay-icons.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
 }
 
+.gform-icon--ifthenpay {
+  font-family: ifthenpay-icons !important;
+  font-weight: 100 !important;
+}
 
-.iftp-gf-icon--small {
-    display: inline-block;
-    width: 34px;
-    height: 34px;
-    background-color: currentcolor;
-    mask: url('../images/ifthenpay-small-icon.svg') no-repeat center / contain;
+.gform-icon--ifthenpay::before {
+  content: "\e002"; /* o unicode que o IcoMoon te der */
 }
