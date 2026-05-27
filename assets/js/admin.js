@@ -26,7 +26,9 @@
 
 	function setMessage(msg, type) {
 		const $el = $('.iftp-gf-message').first();
-		$el.removeClass('iftp-gf-message--success iftp-gf-message--error').text(msg || '');
+		$el.removeClass('iftp-gf-message--success iftp-gf-message--error').text(
+			msg || ''
+		);
 		if (type) {
 			$el.addClass('iftp-gf-message--' + type);
 		}
@@ -289,9 +291,9 @@
 						const current = $defaultSelect.val();
 						$defaultSelect.html(res.data.default_options);
 						if (
-							$defaultSelect
-								.find('option[value="' + current + '"]')
-								.length
+							$defaultSelect.find(
+								'option[value="' + current + '"]'
+							).length
 						) {
 							$defaultSelect.val(current);
 						}
@@ -301,7 +303,8 @@
 					$wrapper.html(
 						'<p class="iftp-gf-error">' +
 							((res && res.data && res.data.message) ||
-								(strings.generic_error || 'Request failed.')) +
+								strings.generic_error ||
+								'Request failed.') +
 							'</p>'
 					);
 				}

@@ -139,14 +139,9 @@ class GF_Field_Ifthenpay extends \GF_Field {
 						?>
 						<span class="iftp-gf-box__method<?php echo $is_default ? ' iftp-gf-box__method--default' : ''; ?>" data-entity="<?php echo esc_attr( $entity_key ); ?>">
 							<span class="iftp-gf-box__method-logo">
-								<picture>
-									<?php if ( $logo_url_dark !== '' ) : ?>
-									<source media="(prefers-color-scheme: dark)" srcset="<?php echo esc_url( $logo_url_dark ); ?>">
-									<?php endif; ?>
-									<img src="<?php echo esc_url( $logo_url ); ?>"
-										<?php if ( $logo_url_dark !== '' ) : ?>data-src-dark="<?php echo esc_url( $logo_url_dark ); ?>"<?php endif; ?>
-										alt="<?php echo esc_attr( $method_label ); ?>" title="<?php echo esc_attr( $method_label ); ?>" loading="lazy">
-								</picture>
+								<img src="<?php echo esc_url( $logo_url ); ?>"
+									<?php if ( $logo_url_dark !== '' ) : ?>data-src-dark="<?php echo esc_url( $logo_url_dark ); ?>"<?php endif; ?>
+									alt="<?php echo esc_attr( $method_label ); ?>" title="<?php echo esc_attr( $method_label ); ?>" loading="lazy">
 							</span>
 						</span>
 						<?php endforeach; ?>

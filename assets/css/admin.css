@@ -101,6 +101,15 @@
     border-color: #114774;
 }
 
+.iftp-gf-method-item__label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    flex: 1;
+    min-width: 0;
+}
+
 /* IsVisible=false from the API — label locked out, activate button remains interactive */
 .iftp-gf-method-item--unactivated {
     border-color: #dcdcde;
@@ -128,15 +137,6 @@
 /* Grayed-out disabled options in the default method dropdown */
 select option:disabled {
     color: #a7aaad;
-}
-
-.iftp-gf-method-item__label {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    cursor: pointer;
-    flex: 1;
-    min-width: 0;
 }
 
 .iftp-gf-method-item__toggle {
@@ -262,7 +262,7 @@ select option:disabled {
   font-style: normal;
   font-weight: 100;
   font-size: 22px;
-  color: rgb(0, 96, 156);
+  color: #00609c;
   line-height: 1;
   display: inline-block;
 }
@@ -271,8 +271,10 @@ select option:disabled {
   content: "\e002";
 }
 
-@media (prefers-color-scheme: dark) {
-  .iftp-gf-field-icon {
-    color: #F6F9FC;
-  }
+.iftp-gf-field--dark .iftp-gf-field-icon {
+  color: #F6F9FC;
+}
+
+.gform-icon.gform-icon--ifthenpay::before {
+    content: "\e002";
 }

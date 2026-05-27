@@ -98,7 +98,7 @@ class Addon extends \GFPaymentAddOn {
 		);
 		wp_enqueue_script(
 			'ifthenpay_gf_frontend',
-			\IFTP_GF_URL . 'assets/js/frontend.min.js',
+			\IFTP_GF_URL . 'assets/js/frontend.js',
 			[],
 			\IFTP_GF_VERSION,
 			true
@@ -129,7 +129,7 @@ class Addon extends \GFPaymentAddOn {
 			],
 			[
 				'handle'  => 'ifthenpay_gf_admin',
-				'src'     => \IFTP_GF_URL . 'assets/js/admin.min.js',
+				'src'     => \IFTP_GF_URL . 'assets/js/admin.js',
 				'version' => \IFTP_GF_VERSION,
 				'deps'    => [ 'jquery' ],
 				'strings' => [
@@ -166,6 +166,8 @@ class Addon extends \GFPaymentAddOn {
 					[ 'admin_page' => [ 'plugin_settings' ] ],
 					[ 'admin_page' => [ 'form_settings' ] ],
 					[ 'admin_page' => [ 'form_editor' ] ],
+					[ 'admin_page' => [ 'entry_list' ] ],
+					[ 'admin_page' => [ 'entry_detail' ] ],
 				],
 			],
 			[
@@ -795,7 +797,7 @@ class Addon extends \GFPaymentAddOn {
 	 * via the expiry safety-net check if the webhook never fires.
 	 */
 	private function activate_callback_for_gateway( string $gateway_key ): void {
-		$base_url  = add_query_arg( 'callback', $this->get_slug(), home_url( '/' ) );
+		$base_url  = add_query_arg( 'callback', $this->get_slug(), home_url( '/ifthenpay_gf' ) );
 		$activated = IfthenpayClient::activate_callback( $gateway_key, $base_url );
 
 		if ( $activated ) {
@@ -1261,8 +1263,6 @@ class Addon extends \GFPaymentAddOn {
 		}
 
 
-
-
 		if ( ! empty( $_GET['status'] ) ) {
 			$status = sanitize_text_field( wp_unslash( (string) $_GET['status'] ) );
 			if ( ! in_array( $status, [ 'cancelled', 'error' ], true ) ) {
@@ -1292,25 +1292,30 @@ class Addon extends \GFPaymentAddOn {
 		}
 
 
-		foreach ( [ 'apk', 'val', 'mtd', 'req' ] as $required ) {
+		foreach ( [ 'apk', 'val' ] as $required ) {
 			if ( ! isset( $_GET[ $required ] ) ) {
 				status_header( 400 );
 				exit( 'Missing ' . esc_html( $required ) );
 			}
 		}
-		// phpcs:Disable WordPress.Security.ValidatedSanitizedInput.InputNotValidated -- validated by entry-meta crosscheck and strict format checks below + validated again in complete_payment() before marking paid
-		$apk = sanitize_text_field( (string) wp_unslash($_GET['apk'] ) );
-		$val = sanitize_text_field( (string) wp_unslash($_GET['val'] ) );
-		$mtd = sanitize_text_field( (string) wp_unslash($_GET['mtd'] ) );
-		$req = sanitize_text_field( (string) wp_unslash($_GET['req'] ) );
-		// phpcs:enable WordPress.Security.ValidatedSanitizedInput.InputNotValidated -- validated by entry-meta crosscheck and strict format checks below + validated again in complete_payment() before marking paid
+		// phpcs:Disable WordPress.Security.ValidatedSanitizedInput.InputNotValidated -- validated by entry-meta crosscheck and strict format checks below
+		$apk = sanitize_text_field( (string) wp_unslash( $_GET['apk'] ) );
+		$val = sanitize_text_field( (string) wp_unslash( $_GET['val'] ) );
+		// phpcs:enable WordPress.Security.ValidatedSanitizedInput.InputNotValidated
 
 
-		$decoded_apk      = trim( (string) base64_decode( $apk, true ) );
-		$expected_gateway = (string) gform_get_meta( $ref, 'iftp_gf_gateway_key' );
-		if ( $decoded_apk === '' || $decoded_apk !== $expected_gateway ) {
+		$expected_gateway  = (string) gform_get_meta( $ref, 'iftp_gf_gateway_key' );
+		$expected_apk      = base64_encode( $expected_gateway ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+		if ( $expected_gateway === '' || $apk !== $expected_apk ) {
 			status_header( 403 );
 			exit( 'apk mismatch' );
+		}
+
+
+		$existing = (string) gform_get_meta( $ref, 'iftp_gf_payment_status' );
+		if ( $existing !== 'pending' ) {
+			status_header( 200 );
+			exit( 'OK (idempotent)' );
 		}
 
 
@@ -1320,26 +1325,11 @@ class Addon extends \GFPaymentAddOn {
 			exit( 'amount mismatch' );
 		}
 
-
-		$catalog = $this->fetch_visible_methods_keyed();
-		if ( ! isset( $catalog[ strtoupper( $mtd ) ] ) && ! is_numeric( $mtd ) ) {
-			status_header( 403 );
-			exit( 'method invalid' );
-		}
-
-
-		$existing = (string) gform_get_meta( $ref, 'iftp_gf_payment_status' );
-		if ( $existing === 'paid' ) {
-			status_header( 200 );
-			exit( 'OK (already paid)' );
-		}
-
 		return [
 			'type'             => 'complete_payment',
 			'entry_id'         => $ref,
 			'amount'           => $expected_amount,
-			'transaction_id'   => $req,
-			'payment_method'   => $mtd,
+			'transaction_id'   => 'IFTP-' . $ref,
 			'payment_date'     => gmdate( 'Y-m-d H:i:s' ),
 			'transaction_type' => 'payment',
 		];

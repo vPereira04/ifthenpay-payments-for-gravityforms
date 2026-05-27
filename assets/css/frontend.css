@@ -16,7 +16,7 @@
   font-style: normal;
   font-weight: 100;
   font-size: 22px;
-  color: rgb(0, 96, 156);
+  color: rgb(0 96 156);
   line-height: 1;
   display: inline-block;
 }
@@ -25,10 +25,8 @@
   content: "\e002";
 }
 
-@media (prefers-color-scheme: dark) {
-  .iftp-gf-field-icon {
-    color: #F6F9FC;
-  }
+.iftp-gf-field--dark .iftp-gf-field-icon {
+  color: #F6F9FC;
 }
 
 /* ---- Box-sizing reset for the field ---- */

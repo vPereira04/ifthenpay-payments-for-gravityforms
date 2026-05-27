@@ -126,13 +126,13 @@ final class IfthenpayClient {
 	 * Throws RuntimeException only on transport / non-2xx errors.
 	 */
 	public static function activate_callback( string $gateway_key, string $base_callback_url ): bool {
-		$url = self::API_BASE . '/endpoint/callback/activation/?cms=moodle';
+		$url = self::API_BASE . '/endpoint/callback/activation/?cms=gravityforms';
 
 		$payload = [
 			'apKey' => base64_encode( $gateway_key ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 			'chave' => $gateway_key,
 			'urlCb' => $base_callback_url
-				. '&ref=[ORDER_ID]&apk=[ANTI_PHISHING_KEY]&val=[AMOUNT]&mtd=[PAYMENT_METHOD]&req=[REQUEST_ID]',
+				. '&ref=[ORDER_ID]&apk=[ANTI_PHISHING_KEY]&val=[AMOUNT]',
 		];
 
 		try {
