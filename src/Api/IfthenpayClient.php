@@ -46,7 +46,7 @@ final class IfthenpayClient {
 			return false;
 		}
 
-		$url = add_query_arg( [ 'boKey' => $backoffice_key ], self::API_BASE . '/gateway/get' );
+		$url = add_query_arg( array( 'boKey' => $backoffice_key ), self::API_BASE . '/gateway/get' );
 
 		try {
 			$data = self::request( 'GET', $url );
@@ -66,7 +66,7 @@ final class IfthenpayClient {
 	 * @return array<int, array<string, mixed>>
 	 */
 	public function get_gateway_keys( string $type = 'GravityForms' ): array {
-		$args = [ 'boKey' => $this->backoffice_key ];
+		$args = array( 'boKey' => $this->backoffice_key );
 
 		$type = sanitize_text_field( $type );
 		if ( $type !== '' ) {
@@ -101,10 +101,10 @@ final class IfthenpayClient {
 		return self::request(
 			'POST',
 			$url,
-			[
-				'headers' => [ 'Content-Type' => 'application/json' ],
+			array(
+				'headers' => array( 'Content-Type' => 'application/json' ),
 				'body'    => wp_json_encode( $payload ),
-			]
+			)
 		);
 	}
 
@@ -119,8 +119,6 @@ final class IfthenpayClient {
 	 *  [ORDER_ID]          → entry ID (the `id` field from the pay-by-link payload)
 	 *  [ANTI_PHISHING_KEY] → base64-encoded gateway key (used to validate authenticity)
 	 *  [AMOUNT]            → payment amount
-	 *  [PAYMENT_METHOD]    → method used (MB, MBWAY, CCARD, …)
-	 *  [REQUEST_ID]        → ifthenpay transaction reference
 	 *
 	 * Returns true when the API responds with "OK", false otherwise.
 	 * Throws RuntimeException only on transport / non-2xx errors.
@@ -128,21 +126,21 @@ final class IfthenpayClient {
 	public static function activate_callback( string $gateway_key, string $base_callback_url ): bool {
 		$url = self::API_BASE . '/endpoint/callback/activation/?cms=gravityforms';
 
-		$payload = [
+		$payload = array(
 			'apKey' => base64_encode( $gateway_key ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 			'chave' => $gateway_key,
 			'urlCb' => $base_callback_url
 				. '&ref=[ORDER_ID]&apk=[ANTI_PHISHING_KEY]&val=[AMOUNT]',
-		];
+		);
 
 		try {
 			$res = self::request(
 				'POST',
 				$url,
-				[
-					'headers' => [ 'Content-Type' => 'application/json' ],
+				array(
+					'headers' => array( 'Content-Type' => 'application/json' ),
 					'body'    => wp_json_encode( $payload ),
-				]
+				)
 			);
 			return (string) ( $res['data'] ?? '' ) === 'OK';
 		} catch ( RuntimeException ) {
@@ -160,10 +158,16 @@ final class IfthenpayClient {
 	private static function request(
 		string $method,
 		string $url,
-		array $args = [],
+		array $args = array(),
 		int $timeout = 20
 	): array {
-		$args = wp_parse_args( $args, [ 'timeout' => $timeout, 'sslverify' => true ] );
+		$args = wp_parse_args(
+			$args,
+			array(
+				'timeout'   => $timeout,
+				'sslverify' => true,
+			)
+		);
 
 		$response = strtoupper( $method ) === 'POST'
 			? wp_remote_post( $url, $args )
@@ -202,7 +206,7 @@ final class IfthenpayClient {
 		}
 
 		if ( ! is_array( $data ) ) {
-			return [ 'data' => $data ];
+			return array( 'data' => $data );
 		}
 
 		return $data;

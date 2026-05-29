@@ -30,12 +30,12 @@ final class GFFormData {
 		$total = 0.0;
 
 		foreach ( $products['products'] as $product ) {
-			$price    = (float) str_replace( [ ',', ' ' ], '', (string) ( $product['price'] ?? 0 ) );
+			$price    = (float) str_replace( array( ',', ' ' ), '', (string) ( $product['price'] ?? 0 ) );
 			$quantity = max( 1, (int) ( $product['quantity'] ?? 1 ) );
 
 			if ( ! empty( $product['options'] ) && is_array( $product['options'] ) ) {
 				foreach ( $product['options'] as $option ) {
-					$price += (float) str_replace( [ ',', ' ' ], '', (string) ( $option['price'] ?? 0 ) );
+					$price += (float) str_replace( array( ',', ' ' ), '', (string) ( $option['price'] ?? 0 ) );
 				}
 			}
 

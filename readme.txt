@@ -90,11 +90,11 @@ All network requests are performed server-side over HTTPS. Sensitive credentials
 
 == Screenshots ==
 1. **(Admin Only) Backoffice Synchronization under GravityForms Settings Payments**
-2. **(Admin Only) GravityForms's admin page (Creation/Editing Form -> Payments)**
-3. **(Admin Only) Adding ifthenpay's Payment field to the selected form**
-4. **(Customers Experience) Payment Gateway field display varies by GravityForms settings**
+2. **(Admin Only) Adding ifthenpay's Payment field to the selected form**
+3. **(Admin Only) GravityForms's admin page (Creation/Editing Form -> Settings)**
+4. **(Admin Only) ifthenpay's Gateway Configuration on Feed Settings**
+5. **(Customers Experience) Payment Gateway field display varies by GravityForms settings**
 6. **(Customers Experience) Payment Window**
-7. **(Customers Experience)  Successful Payment**
 
 == Changelog ==
 

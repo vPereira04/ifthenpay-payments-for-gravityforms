@@ -21,7 +21,7 @@ class GF_Field_Ifthenpay extends \GF_Field {
 	}
 
 	public function get_form_editor_field_title(): string {
-		return esc_attr__( 'ifthenpay', 'ifthenpay-payments-for-gravityforms' );
+		return esc_attr__( 'Ifthenpay', 'ifthenpay-payments-for-gravityforms' );
 	}
 
 	public function get_form_editor_field_icon(): string {
@@ -29,23 +29,30 @@ class GF_Field_Ifthenpay extends \GF_Field {
 	}
 
 	public function get_form_editor_button(): array {
-		return [
+		return array(
 			'group' => 'pricing_fields',
 			'text'  => $this->get_form_editor_field_title(),
-		];
+		);
 	}
 
 	public function get_form_editor_field_settings(): array {
-		return [
+		return array(
 			'label_setting',
 			'description_setting',
 			'css_class_setting',
 			'conditional_logic_field_setting',
-		];
+		);
 	}
 
 	public function is_conditional_logic_supported(): bool {
 		return false;
+	}
+
+	public function get_form_editor_inline_script_on_page_render(): string {
+		return sprintf(
+			"function SetDefaultValues_iftp_pbl(field) { field.label = '%s'; return field; }",
+			esc_js( __( 'Pay By Link', 'ifthenpay-payments-for-gravityforms' ) )
+		);
 	}
 
 
@@ -56,7 +63,8 @@ class GF_Field_Ifthenpay extends \GF_Field {
 		}
 
 		if ( $this->is_entry_detail() ) {
-			return $this->get_entry_detail_display( (string) $value );
+			$entry_id = isset( $entry['id'] ) ? (int) $entry['id'] : 0;
+			return $this->get_entry_detail_display( $entry_id );
 		}
 
 
@@ -64,7 +72,7 @@ class GF_Field_Ifthenpay extends \GF_Field {
 			wp_enqueue_style(
 				'ifthenpay-gf-frontend',
 				\IFTP_GF_URL . 'assets/css/frontend.css',
-				[],
+				array(),
 				\IFTP_GF_VERSION
 			);
 		}
@@ -73,10 +81,12 @@ class GF_Field_Ifthenpay extends \GF_Field {
 		$form_info = FormPaymentInfo::get( $form_id );
 
 		$default_method = strtoupper( (string) ( $form_info['default_method'] ?? '' ) );
-		$active_methods = array_values( array_filter(
-			(array) ( $form_info['pay_methods'] ?? [] ),
-			static fn( array $method ): bool => ! empty( $method['is_active'] )
-		) );
+		$active_methods = array_values(
+			array_filter(
+				(array) ( $form_info['pay_methods'] ?? array() ),
+				static fn( array $method ): bool => ! empty( $method['is_active'] )
+			)
+		);
 
 		if ( empty( $active_methods ) ) {
 			if ( Addon::get_backoffice_key() === '' ) {
@@ -85,7 +95,7 @@ class GF_Field_Ifthenpay extends \GF_Field {
 					. '</p>';
 			}
 
-			$feeds = \GFAPI::get_feeds( null, $form_id, 'iftp_gf' );
+			$feeds           = \GFAPI::get_feeds( null, $form_id, 'iftp_gf' );
 			$has_active_feed = false;
 			if ( is_array( $feeds ) ) {
 				foreach ( $feeds as $feed ) {
@@ -108,7 +118,7 @@ class GF_Field_Ifthenpay extends \GF_Field {
 		ob_start();
 		?>
 		<div class="ginput_container iftp-gf-field iftp-gf-field--preview gform-theme__no-reset--children"
-			 data-form-id="<?php echo esc_attr( (string) $form_id ); ?>">
+			data-form-id="<?php echo esc_attr( (string) $form_id ); ?>">
 
 			<div class="iftp-gf-box">
 
@@ -127,20 +137,24 @@ class GF_Field_Ifthenpay extends \GF_Field {
 				<div class="iftp-gf-box__methods">
 					<div class="iftp-gf-box__methods-title"><?php esc_html_e( 'Payment methods:', 'ifthenpay-payments-for-gravityforms' ); ?></div>
 					<div class="iftp-gf-box__methods-list">
-						<?php foreach ( $active_methods as $method ) :
-							$entity_key    = strtoupper( (string) ( $method['entity'] ?? '' ) );
-							$is_default    = ( $entity_key === $default_method );
-							$logo_url      = (string) ( $method['img_url'] ?? '' );
+						<?php
+						foreach ( $active_methods as $method ) :
+							$entity_key = strtoupper( (string) ( $method['entity'] ?? '' ) );
+							$is_default = ( $entity_key === $default_method );
+							$logo_url   = (string) ( $method['img_url'] ?? '' );
 							if ( $logo_url === '' ) {
 								$logo_url = IfthenpayPayload::fallback_logo_url( $entity_key );
 							}
 							$logo_url_dark = (string) ( $method['img_url_dark'] ?? '' );
 							$method_label  = $entity_key;
-						?>
+							?>
 						<span class="iftp-gf-box__method<?php echo $is_default ? ' iftp-gf-box__method--default' : ''; ?>" data-entity="<?php echo esc_attr( $entity_key ); ?>">
 							<span class="iftp-gf-box__method-logo">
 								<img src="<?php echo esc_url( $logo_url ); ?>"
-									<?php if ( $logo_url_dark !== '' ) : ?>data-src-dark="<?php echo esc_url( $logo_url_dark ); ?>"<?php endif; ?>
+									<?php
+									if ( $logo_url_dark !== '' ) :
+										?>
+										data-src-dark="<?php echo esc_url( $logo_url_dark ); ?>"<?php endif; ?>
 									alt="<?php echo esc_attr( $method_label ); ?>" title="<?php echo esc_attr( $method_label ); ?>" loading="lazy">
 							</span>
 						</span>
@@ -175,7 +189,30 @@ class GF_Field_Ifthenpay extends \GF_Field {
 		return '';
 	}
 
-	public function get_value_entry_detail( $value, $entry = [], $use_text = false, $format = 'html', $media = 'screen' ) {
+	public function get_value_entry_list( $value, $entry, $field_id, $columns, $form ) {
+		$entry_id = isset( $entry['id'] ) ? (int) $entry['id'] : 0;
+		if ( $entry_id <= 0 ) {
+			return '';
+		}
+
+		$status = (string) gform_get_meta( $entry_id, 'iftp_gf_payment_status' );
+
+		switch ( $status ) {
+			case 'paid':
+				return esc_html__( 'Paid', 'ifthenpay-payments-for-gravityforms' );
+			case 'pending':
+				return esc_html__( 'Pending', 'ifthenpay-payments-for-gravityforms' );
+			case 'cancelled':
+				return esc_html__( 'Cancelled', 'ifthenpay-payments-for-gravityforms' );
+			case 'failed':
+				$error = (string) gform_get_meta( $entry_id, 'iftp_gf_error_message' );
+				return $error !== '' ? esc_html( $error ) : esc_html__( 'Failed', 'ifthenpay-payments-for-gravityforms' );
+			default:
+				return '';
+		}
+	}
+
+	public function get_value_entry_detail( $value, $entry = array(), $use_text = false, $format = 'html', $media = 'screen' ) {
 		return esc_html( (string) $value );
 	}
 
@@ -204,10 +241,32 @@ class GF_Field_Ifthenpay extends \GF_Field {
 		return (string) ob_get_clean();
 	}
 
-	private function get_entry_detail_display( string $value ): string {
-		if ( $value === '' ) {
+	private function get_entry_detail_display( int $entry_id ): string {
+		if ( $entry_id <= 0 ) {
 			return '<span style="color:#8c8f94;">' . esc_html__( 'No payment data.', 'ifthenpay-payments-for-gravityforms' ) . '</span>';
 		}
-		return '<code>' . esc_html( $value ) . '</code>';
+
+		$status = (string) gform_get_meta( $entry_id, 'iftp_gf_payment_status' );
+
+		switch ( $status ) {
+			case 'paid':
+				return '<span style="color:#00a32a;">&#10003; ' . esc_html__( 'User paid successfully.', 'ifthenpay-payments-for-gravityforms' ) . '</span>';
+
+			case 'pending':
+				return '<span style="color:#dba617;">&#8987; ' . esc_html__( 'Payment pending.', 'ifthenpay-payments-for-gravityforms' ) . '</span>';
+
+			case 'cancelled':
+				return '<span style="color:#d63638;">&#10007; ' . esc_html__( 'User cancelled transaction.', 'ifthenpay-payments-for-gravityforms' ) . '</span>';
+
+			case 'failed':
+				$error = (string) gform_get_meta( $entry_id, 'iftp_gf_error_message' );
+				if ( $error !== '' ) {
+					return '<span style="color:#d63638;">&#10007; ' . esc_html__( 'Payment failed:', 'ifthenpay-payments-for-gravityforms' ) . ' ' . esc_html( $error ) . '</span>';
+				}
+				return '<span style="color:#d63638;">&#10007; ' . esc_html__( 'Payment failed.', 'ifthenpay-payments-for-gravityforms' ) . '</span>';
+
+			default:
+				return '<span style="color:#8c8f94;">' . esc_html__( 'No payment data.', 'ifthenpay-payments-for-gravityforms' ) . '</span>';
+		}
 	}
 }

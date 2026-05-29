@@ -15,13 +15,7 @@ use Ifthenpay\GravityForms\Api\IfthenpayReturn;
 use Ifthenpay\GravityForms\Mail\IfthenpayEmailHelper;
 use Ifthenpay\GravityForms\Repository\FormPaymentInfo;
 
-require_once \IFTP_GF_DIR . 'src/Api/IfthenpayClient.php';
-require_once \IFTP_GF_DIR . 'src/Api/IfthenpayPayload.php';
-require_once \IFTP_GF_DIR . 'src/Api/IfthenpayReturn.php';
-require_once \IFTP_GF_DIR . 'src/Api/GFFormData.php';
-require_once \IFTP_GF_DIR . 'src/Mail/IfthenpayEmailHelper.php';
-require_once \IFTP_GF_DIR . 'src/Repository/FormPaymentInfo.php';
-require_once \IFTP_GF_DIR . 'src/Field/GF_Field_Ifthenpay.php';
+
 
 class Addon extends \GFPaymentAddOn {
 
@@ -46,6 +40,7 @@ class Addon extends \GFPaymentAddOn {
 
 	private const SIGNUP_URL = 'https://ifthenpay.com';
 
+	private const CALLBACK_PATH = '/aWZ0cF90Jm9fZ2Zf';
 
 
 	public static function get_instance(): self {
@@ -68,21 +63,21 @@ class Addon extends \GFPaymentAddOn {
 		parent::init();
 
 		\GF_Fields::register( new \Ifthenpay\GravityForms\Field\GF_Field_Ifthenpay() );
-		add_action( 'template_redirect', [ $this, 'handle_gateway_return' ], 5 );
+		add_action( 'template_redirect', array( $this, 'handle_gateway_return' ), 5 );
 
 
-		add_filter( 'gform_validation', [ $this, 'enforce_single_payment_gateway' ] );
+		add_action( 'wp', array( $this, 'setup_submission_state' ), 5 );
 
 
-		add_filter( 'gform_get_form_filter', [ $this, 'inject_payment_status_banner' ], 10, 2 );
+		add_filter( 'gform_validation', array( $this, 'enforce_single_payment_gateway' ) );
 	}
 
 	public function init_admin(): void {
 		parent::init_admin();
-		add_action( 'admin_notices', [ $this, 'render_admin_notices' ] );
+		add_action( 'admin_notices', array( $this, 'render_admin_notices' ) );
 
 
-		add_action( 'enqueue_block_editor_assets', [ $this, 'enqueue_block_editor_styles' ] );
+		add_action( 'enqueue_block_editor_assets', array( $this, 'enqueue_block_editor_styles' ) );
 	}
 
 	/**
@@ -93,13 +88,13 @@ class Addon extends \GFPaymentAddOn {
 		wp_enqueue_style(
 			'ifthenpay-gf-frontend',
 			\IFTP_GF_URL . 'assets/css/frontend.css',
-			[],
+			array(),
 			\IFTP_GF_VERSION
 		);
 		wp_enqueue_script(
 			'ifthenpay_gf_frontend',
 			\IFTP_GF_URL . 'assets/js/frontend.js',
-			[],
+			array(),
 			\IFTP_GF_VERSION,
 			true
 		);
@@ -108,31 +103,32 @@ class Addon extends \GFPaymentAddOn {
 	public function init_ajax(): void {
 		parent::init_ajax();
 
-		add_action( 'wp_ajax_iftp_gf_connect_backoffice',    [ $this, 'ajax_connect_backoffice' ] );
-		add_action( 'wp_ajax_iftp_gf_disconnect_backoffice', [ $this, 'ajax_disconnect_backoffice' ] );
-		add_action( 'wp_ajax_iftp_gf_activate_method',       [ $this, 'ajax_activate_payment_method' ] );
-		add_action( 'wp_ajax_iftp_gf_get_methods_table',     [ $this, 'ajax_get_methods_table' ] );
+		add_action( 'wp_ajax_iftp_gf_connect_backoffice', array( $this, 'ajax_connect_backoffice' ) );
+		add_action( 'wp_ajax_iftp_gf_disconnect_backoffice', array( $this, 'ajax_disconnect_backoffice' ) );
+		add_action( 'wp_ajax_iftp_gf_activate_method', array( $this, 'ajax_activate_payment_method' ) );
+		add_action( 'wp_ajax_iftp_gf_get_methods_table', array( $this, 'ajax_get_methods_table' ) );
+		add_filter( 'gform_validation_message', array( $this, 'card_type_validation_message' ), 10, 2 );
 	}
 
 
 
 	public function scripts(): array {
-		$scripts = [
-			[
+		$scripts = array(
+			array(
 				'handle'  => 'ifthenpay_gf_frontend',
 				'src'     => \IFTP_GF_URL . 'assets/js/frontend.js',
 				'version' => \IFTP_GF_VERSION,
-				'deps'    => [],
-				'enqueue' => [
-					[ 'field_types' => [ 'iftp_pbl' ] ],
-				],
-			],
-			[
+				'deps'    => array(),
+				'enqueue' => array(
+					array( 'field_types' => array( 'iftp_pbl' ) ),
+				),
+			),
+			array(
 				'handle'  => 'ifthenpay_gf_admin',
 				'src'     => \IFTP_GF_URL . 'assets/js/admin.js',
 				'version' => \IFTP_GF_VERSION,
-				'deps'    => [ 'jquery' ],
-				'strings' => [
+				'deps'    => array( 'jquery' ),
+				'strings' => array(
 					'ajax_url'            => admin_url( 'admin-ajax.php' ),
 					'nonce'               => wp_create_nonce( 'iftp_gf_admin' ),
 					'connecting'          => __( 'Connecting...', 'ifthenpay-payments-for-gravityforms' ),
@@ -143,42 +139,45 @@ class Addon extends \GFPaymentAddOn {
 					'activation_button'   => __( 'Request Activation', 'ifthenpay-payments-for-gravityforms' ),
 					'activation_sending'  => __( 'Sending...', 'ifthenpay-payments-for-gravityforms' ),
 					'activation_sent'     => __( 'Activation request sent.', 'ifthenpay-payments-for-gravityforms' ),
-					'activation_cooldown'  => __( 'Request already sent. Please wait 24 hours.', 'ifthenpay-payments-for-gravityforms' ),
-					'methods_loading'      => __( 'Loading payment methods…', 'ifthenpay-payments-for-gravityforms' ),
-				],
-				'enqueue' => [
-					[ 'admin_page' => [ 'plugin_settings' ] ],
-					[ 'admin_page' => [ 'form_settings' ], 'tab' => $this->_slug ],
-				],
-			],
-		];
+					'activation_cooldown' => __( 'Request already sent. Please wait 24 hours.', 'ifthenpay-payments-for-gravityforms' ),
+					'methods_loading'     => __( 'Loading payment methods…', 'ifthenpay-payments-for-gravityforms' ),
+				),
+				'enqueue' => array(
+					array( 'admin_page' => array( 'plugin_settings' ) ),
+					array(
+						'admin_page' => array( 'form_settings' ),
+						'tab'        => $this->_slug,
+					),
+				),
+			),
+		);
 
 		return array_merge( parent::scripts(), $scripts );
 	}
 
 	public function styles(): array {
-		$styles = [
-			[
+		$styles = array(
+			array(
 				'handle'  => 'ifthenpay-gf-admin',
 				'src'     => \IFTP_GF_URL . 'assets/css/admin.css',
 				'version' => \IFTP_GF_VERSION,
-				'enqueue' => [
-					[ 'admin_page' => [ 'plugin_settings' ] ],
-					[ 'admin_page' => [ 'form_settings' ] ],
-					[ 'admin_page' => [ 'form_editor' ] ],
-					[ 'admin_page' => [ 'entry_list' ] ],
-					[ 'admin_page' => [ 'entry_detail' ] ],
-				],
-			],
-			[
+				'enqueue' => array(
+					array( 'admin_page' => array( 'plugin_settings' ) ),
+					array( 'admin_page' => array( 'form_settings' ) ),
+					array( 'admin_page' => array( 'form_editor' ) ),
+					array( 'admin_page' => array( 'entry_list' ) ),
+					array( 'admin_page' => array( 'entry_detail' ) ),
+				),
+			),
+			array(
 				'handle'  => 'ifthenpay-gf-frontend',
 				'src'     => \IFTP_GF_URL . 'assets/css/frontend.css',
 				'version' => \IFTP_GF_VERSION,
-				'enqueue' => [
-					[ 'field_types' => [ 'iftp_pbl' ] ],
-				],
-			],
-		];
+				'enqueue' => array(
+					array( 'field_types' => array( 'iftp_pbl' ) ),
+				),
+			),
+		);
 
 		return array_merge( parent::styles(), $styles );
 	}
@@ -186,18 +185,18 @@ class Addon extends \GFPaymentAddOn {
 
 
 	public function plugin_settings_fields(): array {
-		return [
-			[
+		return array(
+			array(
 				'title'  => __( 'ifthenpay | Payment Gateway', 'ifthenpay-payments-for-gravityforms' ),
-				'fields' => [
-					[
+				'fields' => array(
+					array(
 						'type'     => 'iftp_gf_backoffice_connection',
 						'name'     => 'iftp_gf_connection_ui',
 						'no_label' => true,
-					],
-				],
-			],
-		];
+					),
+				),
+			),
+		);
 	}
 
 	/**
@@ -205,18 +204,18 @@ class Addon extends \GFPaymentAddOn {
 	 */
 	public function settings_iftp_gf_backoffice_connection( mixed $_field, bool $echo = true ): string {
 		$is_connected = self::get_backoffice_key() !== '';
-		$nonce = wp_create_nonce( 'iftp_gf_admin' );
+		$nonce        = wp_create_nonce( 'iftp_gf_admin' );
 		$masked_key   = $is_connected ? str_repeat( '*', 18 ) : '';
 
 		ob_start();
 		?>
 		<?php if ( ! $is_connected ) : ?>
-		<p class="description">
-			<?php esc_html_e( 'Connect your ifthenpay Backoffice Key to load your gateways. Gateway selection and payment methods are configured per form in feed settings.', 'ifthenpay-payments-for-gravityforms' ); ?>
-			&nbsp;<a href="<?php echo esc_url( self::SIGNUP_URL ); ?>" target="_blank" rel="noopener noreferrer">
-				<?php esc_html_e( 'Not a client? Sign up here.', 'ifthenpay-payments-for-gravityforms' ); ?>
-			</a>
-		</p>
+			<p class="description">
+				<?php esc_html_e( 'Connect your ifthenpay Backoffice Key to load your gateways. Gateway selection and payment methods are configured per form in feed settings.', 'ifthenpay-payments-for-gravityforms' ); ?>
+				&nbsp;<a href="<?php echo esc_url( self::SIGNUP_URL ); ?>" target="_blank" rel="noopener noreferrer">
+					<?php esc_html_e( 'Not a client? Sign up here.', 'ifthenpay-payments-for-gravityforms' ); ?>
+				</a>
+			</p>
 		<?php endif; ?>
 
 		<div class="iftp-gf-key-row<?php echo $is_connected ? ' iftp-gf-key-row--hidden' : ''; ?>">
@@ -226,14 +225,15 @@ class Addon extends \GFPaymentAddOn {
 				class="regular-text"
 				placeholder="Insert your backoffice key here..."
 				value="<?php echo esc_attr( $masked_key ); ?>"
-				autocomplete="off"
-			/>
+				autocomplete="off" />
 			<button type="button" id="iftp-gf-connect-backoffice" class="primary button large">
 				<?php esc_html_e( 'Connect', 'ifthenpay-payments-for-gravityforms' ); ?>
 			</button>
 		</div>
 
-		<?php echo $this->render_connection_card_html(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- sanitized inside render_connection_card_html() ?>
+		<?php
+		echo $this->render_connection_card_html(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- sanitized inside render_connection_card_html()
+		?>
 
 		<p><span class="iftp-gf-message" aria-live="polite"></span></p>
 
@@ -252,49 +252,49 @@ class Addon extends \GFPaymentAddOn {
 
 
 	public function feed_settings_fields(): array {
-		return [
-			[
+		return array(
+			array(
 				'title'  => __( 'Feed Settings', 'ifthenpay-payments-for-gravityforms' ),
-				'fields' => [
-					[
+				'fields' => array(
+					array(
 						'label'    => __( 'Feed Name', 'ifthenpay-payments-for-gravityforms' ),
 						'type'     => 'text',
 						'name'     => 'feedName',
 						'required' => true,
 						'class'    => 'medium',
 						'tooltip'  => __( 'A name for this payment feed. Used to identify it in the feed list.', 'ifthenpay-payments-for-gravityforms' ),
-					],
-					[
+					),
+					array(
 						'label'   => __( 'Gateway Key', 'ifthenpay-payments-for-gravityforms' ),
 						'type'    => 'select',
 						'name'    => 'gateway_key',
 						'tooltip' => __( 'Select the ifthenpay gateway key for this form. The payment methods table updates automatically when you change the selection.', 'ifthenpay-payments-for-gravityforms' ),
 						'choices' => $this->get_gateway_key_choices(),
-					],
-					[
+					),
+					array(
 						'label'    => __( 'Payment Methods', 'ifthenpay-payments-for-gravityforms' ),
 						'type'     => 'iftp_gf_methods_table',
 						'name'     => 'methods_config',
 						'no_label' => false,
 						'tooltip'  => __( 'Enable the payment methods available on this gateway. Disabled methods will not appear at checkout.', 'ifthenpay-payments-for-gravityforms' ),
-					],
-					[
+					),
+					array(
 						'label'   => __( 'Default Method', 'ifthenpay-payments-for-gravityforms' ),
 						'type'    => 'select',
 						'name'    => 'default_method',
 						'tooltip' => __( 'The payment method preselected when the customer opens the Pay By Link page. Methods you have not enabled above are shown but cannot be selected.', 'ifthenpay-payments-for-gravityforms' ),
 						'choices' => $this->get_default_method_choices(),
-					],
-					[
+					),
+					array(
 						'label'   => __( 'Payment Description', 'ifthenpay-payments-for-gravityforms' ),
 						'type'    => 'text',
 						'name'    => 'description',
 						'class'   => 'medium',
 						'tooltip' => __( 'Optional description shown on the payment page (e.g., the store or product name).', 'ifthenpay-payments-for-gravityforms' ),
-					],
-				],
-			],
-		];
+					),
+				),
+			),
+		);
 	}
 
 	/**
@@ -353,7 +353,7 @@ class Addon extends \GFPaymentAddOn {
 	private function read_methods_config_from_active_feed(): array {
 		$feed = $this->get_active_feed_for_settings();
 		if ( $feed === null || empty( $feed['meta']['methods_config'] ) ) {
-			return [];
+			return array();
 		}
 		$raw = $feed['meta']['methods_config'];
 		return is_string( $raw ) ? (array) json_decode( $raw, true ) : (array) $raw;
@@ -368,17 +368,17 @@ class Addon extends \GFPaymentAddOn {
 	 */
 	private function build_method_rows_for_gateway( string $gateway_key ): array {
 		if ( $gateway_key === '' ) {
-			return [];
+			return array();
 		}
 
 		$row = $this->find_gateway_row( $gateway_key );
 		if ( $row === null ) {
-			return [];
+			return array();
 		}
 
-		$rows = [];
+		$rows = array();
 		foreach ( $this->fetch_visible_methods_keyed() as $entity => $cat_entry ) {
-			$rows[] = [
+			$rows[] = array(
 				'entity'         => $entity,
 				'label'          => (string) ( $cat_entry['label'] ?? $entity ),
 
@@ -388,7 +388,7 @@ class Addon extends \GFPaymentAddOn {
 				'image_url_dark' => (string) ( $cat_entry['small_image_url_dark'] ?? '' ),
 
 				'position'       => (int) ( $cat_entry['position'] ?? 0 ),
-			];
+			);
 		}
 
 		return $rows;
@@ -398,30 +398,35 @@ class Addon extends \GFPaymentAddOn {
 	 * Renders the methods table inside the feed-settings page. Static-only,
 	 * one row per provisioned method, checkbox bound to is_active.
 	 *
-	 * @param array<int, array<string, string>>           $methods
-	 * @param array<string, array<string, mixed>>         $methods_config
+	 * @param array<int, array<string, string>>   $methods
+	 * @param array<string, array<string, mixed>> $methods_config
 	 */
 	private function render_methods_list( array $methods, array $methods_config ): void {
 
 		$gateway_key = (string) ( $this->get_setting( 'gateway_key' ) ?? '' );
 		?>
 		<div class="iftp-gf-methods-list">
-			<?php foreach ( $methods as $method ) :
-				$entity_key    = $method['entity'];
-				$method_label  = $method['label'];
-				$account       = $method['account'];
+			<?php
+			foreach ( $methods as $method ) :
+				$entity_key     = $method['entity'];
+				$method_label   = $method['label'];
+				$account        = $method['account'];
 				$is_provisioned = ( $account !== '' );
-				$logo_url      = $method['image_url'] !== ''
+				$logo_url       = $method['image_url'] !== ''
 					? $method['image_url']
 					: IfthenpayPayload::fallback_logo_url( $entity_key );
 
-				$is_enabled    = $is_provisioned && ! empty( $methods_config[ $entity_key ]['enabled'] );
-				$is_wide_logo  = $entity_key === 'CCARD';
+				$is_enabled   = $is_provisioned && ! empty( $methods_config[ $entity_key ]['enabled'] );
+				$is_wide_logo = $entity_key === 'CCARD';
 
 				$item_classes = 'iftp-gf-method-item';
-				if ( $is_enabled )         { $item_classes .= ' iftp-gf-method-item--enabled'; }
-				if ( ! $is_provisioned )   { $item_classes .= ' iftp-gf-method-item--unactivated'; }
-			?>
+				if ( $is_enabled ) {
+					$item_classes .= ' iftp-gf-method-item--enabled';
+				}
+				if ( ! $is_provisioned ) {
+					$item_classes .= ' iftp-gf-method-item--unactivated';
+				}
+				?>
 				<div class="<?php echo esc_attr( $item_classes ); ?>" data-entity="<?php echo esc_attr( $entity_key ); ?>">
 					<label class="iftp-gf-method-item__label">
 						<input
@@ -431,13 +436,11 @@ class Addon extends \GFPaymentAddOn {
 							<?php checked( $is_enabled ); ?>
 							<?php disabled( ! $is_provisioned ); ?>
 							class="iftp-gf-method-item__toggle"
-							data-entity="<?php echo esc_attr( $entity_key ); ?>"
-						/>
+							data-entity="<?php echo esc_attr( $entity_key ); ?>" />
 						<input
 							type="hidden"
 							name="_gform_setting_methods_config[<?php echo esc_attr( $entity_key ); ?>][account]"
-							value="<?php echo esc_attr( $account ); ?>"
-						/>
+							value="<?php echo esc_attr( $account ); ?>" />
 						<span class="iftp-gf-method-item__icon-wrap<?php echo $is_wide_logo ? ' iftp-gf-method-item__icon-wrap--wide' : ''; ?>">
 							<img src="<?php echo esc_url( $logo_url ); ?>" alt="<?php echo esc_attr( $method_label ); ?>" loading="lazy" />
 						</span>
@@ -454,8 +457,7 @@ class Addon extends \GFPaymentAddOn {
 								type="button"
 								class="button button-small iftp-gf-method-item__activate-btn"
 								data-entity="<?php echo esc_attr( $entity_key ); ?>"
-								data-gateway-key="<?php echo esc_attr( $gateway_key ); ?>"
-							>
+								data-gateway-key="<?php echo esc_attr( $gateway_key ); ?>">
 								<?php esc_html_e( 'Request Activation', 'ifthenpay-payments-for-gravityforms' ); ?>
 							</button>
 						<?php endif; ?>
@@ -471,8 +473,8 @@ class Addon extends \GFPaymentAddOn {
 	 */
 	public function settings_iftp_gf_payment_methods_table( mixed $_field, bool $echo = true ): string {
 
-		$gateways          = $this->fetch_gravityforms_gateways();
-		$visible_methods   = $this->fetch_visible_methods_keyed();
+		$gateways        = $this->fetch_gravityforms_gateways();
+		$visible_methods = $this->fetch_visible_methods_keyed();
 
 		ob_start();
 
@@ -490,19 +492,20 @@ class Addon extends \GFPaymentAddOn {
 					</tr>
 				</thead>
 				<tbody>
-					<?php foreach ( $gateways as $row ) :
+					<?php
+					foreach ( $gateways as $row ) :
 						$key   = (string) ( $row['GatewayKey'] ?? '' );
 						$alias = (string) ( $row['Alias'] ?? '' );
 						if ( $key === '' ) {
 							continue;
 						}
-						$provisioned = [];
+						$provisioned = array();
 						foreach ( $visible_methods as $entity => $cat_entry ) {
 							if ( $this->resolve_account_in_row( $row, $entity, (string) ( $cat_entry['label'] ?? '' ) ) !== '' ) {
 								$provisioned[] = $entity;
 							}
 						}
-					?>
+						?>
 						<tr>
 							<td><code><?php echo esc_html( $key ); ?></code></td>
 							<td><?php echo esc_html( $alias ); ?></td>
@@ -546,8 +549,8 @@ class Addon extends \GFPaymentAddOn {
 				/* translators: %s: link to plugin settings page */
 				__( 'To get started, %s.', 'ifthenpay-payments-for-gravityforms' ),
 				'<a href="' . esc_url( $this->get_plugin_settings_url() ) . '">'
-				. esc_html__( 'connect your ifthenpay Backoffice Key', 'ifthenpay-payments-for-gravityforms' )
-				. '</a>'
+					. esc_html__( 'connect your ifthenpay Backoffice Key', 'ifthenpay-payments-for-gravityforms' )
+					. '</a>'
 			);
 		}
 
@@ -608,7 +611,7 @@ class Addon extends \GFPaymentAddOn {
 
 
 		if ( ! empty( $settings['gateway_key'] ) ) {
-			$raw            = $settings['methods_config'] ?? [];
+			$raw            = $settings['methods_config'] ?? array();
 			$methods_config = is_string( $raw ) ? (array) json_decode( $raw, true ) : (array) $raw;
 			$any_enabled    = false;
 			foreach ( $methods_config as $cfg ) {
@@ -691,7 +694,7 @@ class Addon extends \GFPaymentAddOn {
 					FormPaymentInfo::save( $form_id, $per_feed_snapshot );
 				} else {
 
-					$this->sync_form_payment_info( $form_id, (array) ( $feed['meta'] ?? [] ) );
+					$this->sync_form_payment_info( $form_id, (array) ( $feed['meta'] ?? array() ) );
 				}
 			}
 		}
@@ -739,13 +742,13 @@ class Addon extends \GFPaymentAddOn {
 		}
 
 
-		$method_rows         = $this->build_method_rows_for_gateway( $gateway_key );
-		$methods_config_raw  = $settings['methods_config'] ?? [];
-		$methods_config      = is_string( $methods_config_raw )
+		$method_rows        = $this->build_method_rows_for_gateway( $gateway_key );
+		$methods_config_raw = $settings['methods_config'] ?? array();
+		$methods_config     = is_string( $methods_config_raw )
 			? (array) json_decode( $methods_config_raw, true )
 			: (array) $methods_config_raw;
 
-		$pay_methods = [];
+		$pay_methods = array();
 		foreach ( $method_rows as $row ) {
 
 			if ( (string) ( $row['account'] ?? '' ) === '' ) {
@@ -754,22 +757,22 @@ class Addon extends \GFPaymentAddOn {
 			$position      = $row['position'];
 			$entity        = $row['entity'];
 			$is_active     = ! empty( $methods_config[ $entity ]['enabled'] );
-			$pay_methods[] = [
+			$pay_methods[] = array(
 				'entity'       => $entity,
 				'account'      => $row['account'],
 				'is_active'    => $is_active,
 				'position'     => $position,
 				'img_url'      => $row['image_url'],
 				'img_url_dark' => (string) ( $row['image_url_dark'] ?? '' ),
-			];
+			);
 		}
 
-		$snapshot = [
+		$snapshot = array(
 			'gateway_key'     => $gateway_key,
 			'default_method'  => strtoupper( (string) ( $settings['default_method'] ?? '' ) ),
 			'pay_description' => sanitize_text_field( (string) ( $settings['description'] ?? '' ) ),
 			'pay_methods'     => $pay_methods,
-		];
+		);
 
 		FormPaymentInfo::save( $form_id, $snapshot );
 
@@ -797,21 +800,25 @@ class Addon extends \GFPaymentAddOn {
 	 * via the expiry safety-net check if the webhook never fires.
 	 */
 	private function activate_callback_for_gateway( string $gateway_key ): void {
-		$base_url  = add_query_arg( 'callback', $this->get_slug(), home_url( '/ifthenpay_gf' ) );
+		$base_url  = add_query_arg( 'callback', $this->get_slug(), home_url( self::CALLBACK_PATH ) );
 		$activated = IfthenpayClient::activate_callback( $gateway_key, $base_url );
 
 		if ( $activated ) {
-			$this->log_debug( sprintf(
-				'%s(): Callback activated for gateway key %s.',
-				__METHOD__,
-				$gateway_key
-			) );
+			$this->log_debug(
+				sprintf(
+					'%s(): Callback activated for gateway key %s.',
+					__METHOD__,
+					$gateway_key
+				)
+			);
 		} else {
-			$this->log_error( sprintf(
-				'%s(): Failed to activate callback for gateway key %s. Async payments will fall back to the expiry safety-net check.',
-				__METHOD__,
-				$gateway_key
-			) );
+			$this->log_error(
+				sprintf(
+					'%s(): Failed to activate callback for gateway key %s. Async payments will fall back to the expiry safety-net check.',
+					__METHOD__,
+					$gateway_key
+				)
+			);
 		}
 	}
 
@@ -831,176 +838,49 @@ class Addon extends \GFPaymentAddOn {
 		return $data;
 	}
 
-	public function redirect_url( $feed, $submission_data, $form, $entry ): string {
-		$form_id  = (int) rgar( $form, 'id' );
-		$entry_id = (int) rgar( $entry, 'id' );
+	public function redirect_url( $feed, $submission_data, $form, $entry ) {
+		$form_id  = (int) $feed['form_id'];
+		$entry_id = (int) $entry['id'];
 
-
-		foreach ( $form['fields'] ?? [] as $field ) {
-			if ( isset( $field->type ) && $field->type === 'iftp_pbl' ) {
-				if ( \GFFormsModel::is_field_hidden( $form, $field, [], $entry ) ) {
-					$this->log_debug( __METHOD__ . '(): iftp_pbl field is hidden by conditional logic — skipping redirect.' );
-					return '';
-				}
-				break;
-			}
-		}
-
-
-		$competing = $this->get_competing_payment_addon_slugs( $form_id );
-		if ( ! empty( $competing ) ) {
-			$this->log_error( sprintf(
-				'%s(): Refusing to process — competing payment add-on feed(s) on form #%d: %s',
-				__METHOD__,
-				$form_id,
-				implode( ', ', $competing )
-			) );
-			return '';
-		}
-
-		$backoffice_key = self::get_backoffice_key();
-		if ( $backoffice_key === '' ) {
-			$this->log_error( __METHOD__ . '(): No backoffice key configured.' );
-			return '';
-		}
-
-		$form_info = self::get_form_payment_info( $form_id );
-
-		$gateway_key = (string) ( $form_info['gateway_key'] ?? '' );
-		if ( $gateway_key === '' ) {
-			$this->log_error( __METHOD__ . '(): No gateway key in form info.' );
-			return '';
-		}
-
-		$amount = (float) ( $submission_data['payment_amount'] ?? 0 );
-		if ( $amount <= 0 ) {
-			$this->log_error( __METHOD__ . '(): Payment amount is 0.' );
-			return '';
-		}
-
-
-		$pay_methods = (array) ( $form_info['pay_methods'] ?? [] );
-		if ( empty( $pay_methods ) ) {
-			$this->log_error( __METHOD__ . '(): No pay_methods in form info for form #' . $form_id );
-			return '';
-		}
-
-		$account_parts        = [];
-		$active_method_config = [];
-		$selected_position    = 0;
-		$default_method = strtoupper( (string) ( $form_info['default_method'] ?? '' ) );
-
-		foreach ( $pay_methods as $method ) {
-			if ( empty( $method['is_active'] ) ) {
-				continue;
-			}
-			$entity = strtoupper( (string) ( $method['entity'] ?? '' ) );
-			$acct   = trim( (string) ( $method['account'] ?? '' ) );
-			$position = abs((int) ($method['position'] ?? 0));
-
-			if ( $entity === '' || $acct === '' || $position === 0) {
-				continue;
-			}
-			$account_parts[]              = preg_replace( '/\s*\|\s*/', '|', $acct );
-
-			if ( $entity === $default_method ) {
-				$selected_position = $position;
-			}
-
-			$active_method_config[ $entity ] = [ 'enabled' => '1', 'account' => $acct, 'position' => $position];
-		}
-		$accounts = implode( ';', $account_parts );
-
-		if ( $accounts === '' ) {
-			$this->log_error( __METHOD__ . '(): No methods flagged is_active for form #' . $form_id );
-			return '';
-		}
-
-		$source_url = (string) rgar( $entry, 'source_url' );
-		$base_url   = $source_url !== '' ? $source_url : home_url( '/' );
-
-		$urls = IfthenpayPayload::build_gateway_urls( $entry_id, $base_url );
-
-		$customer_email = GFFormData::get_customer_email( $form, $entry );
-		$customer_name  = GFFormData::get_customer_name( $form, $entry );
-
-		$description    = sanitize_text_field( (string) ( $form_info['pay_description'] ?? '' ) );
-
-		$payload = IfthenpayPayload::build_pay_by_link_payload( [
-			'id'              => (string) $entry_id,
-			'amount'          => $amount,
-			'description'     => $description !== '' ? $description : get_bloginfo( 'name' ),
-			'accounts'        => $accounts,
-			'success_url'     => $urls['success_url'],
-			'error_url'       => $urls['error_url'],
-			'cancel_url'      => $urls['cancel_url'],
-
-			'selected_method' => $selected_position > 0 ? (string) $selected_position : '',
-			'email'           => $customer_email,
-			'name'            => $customer_name,
-		] );
-
-		$this->log_debug( sprintf(
-			'%s(): Entry #%d → calling create_payment_link gateway=%s amount=%.2f accounts=%s selected=%d',
-			__METHOD__,
-			$entry_id,
-			$gateway_key,
-			$amount,
-			$accounts,
-			$selected_position
-		) );
+		$form_info   = self::get_form_payment_info( $form_id );
+		$gateway_key = (string) ( $form_info['gateway_key'] );
+		$amount      = (float) ( $submission_data['payment_amount'] );
 
 		try {
+
+			$payload = IfthenpayPayload::build_pay_by_link_payload( $entry, $submission_data, $form_info );
 			$response = IfthenpayClient::create_payment_link( $gateway_key, $payload );
-		} catch ( \RuntimeException $e ) {
-			$this->log_error( __METHOD__ . '(): API error — ' . $e->getMessage() );
-			return '';
+		} catch ( \Exception $e ) {
+			\GFAPI::update_entry_property( $entry_id, 'payment_status', 'Failed' );
+			gform_update_meta( $entry_id, 'iftp_gf_payment_status', 'failed' );
+			gform_update_meta( $entry_id, 'iftp_gf_error_message', $e->getMessage() );
+
+			$source_url = (string) rgar( $entry, 'source_url' );
+			if ( $source_url !== '' ) {
+				return add_query_arg(
+					array(
+						'iftp_gf_status' => 'failed',
+						'iftp_gf_entry'  => $entry_id,
+					),
+					$source_url
+				);
+			}
+
+			return;
 		}
 
+		$redirect_url   = (string) $response['RedirectUrl'];
+		$transaction_id = (string) $response['PinCode'];
 
-		$redirect_url   = (string) (
-			$response['PinpayUrl']
-			?? $response['RedirectUrl']
-			?? $response['url']
-			?? $response['PaymentUrl']
-			?? $response['paymentUrl']
-			?? ''
-		);
-		$transaction_id = (string) (
-			$response['PinCode']
-			?? $response['RequestId']
-			?? $response['requestId']
-			?? $response['transactionId']
-			?? ''
-		);
+		$this->insert_transaction( $entry_id, 'payment', $transaction_id, $amount );
 
-		$this->log_debug( sprintf(
-			'%s(): Entry #%d ← API response url=%s tx=%s',
-			__METHOD__,
-			$entry_id,
-			$redirect_url !== '' ? 'set' : 'EMPTY',
-			$transaction_id
-		) );
-
-		if ( $redirect_url === '' ) {
-			$this->log_error( __METHOD__ . '(): Empty redirect URL in API response.' );
-			return '';
-		}
-
-		if ( $transaction_id !== '' ) {
-			$this->insert_transaction( $entry_id, 'payment', $transaction_id, $amount );
-			gform_update_meta( $entry_id, 'iftp_gf_transaction_id', $transaction_id );
-			gform_update_meta( $entry_id, 'iftp_gf_gateway_key', $gateway_key );
-		}
-
+		gform_update_meta( $entry_id, 'iftp_gf_transaction_id', $transaction_id );
+		gform_update_meta( $entry_id, 'iftp_gf_gateway_key', $gateway_key );
 		gform_update_meta( $entry_id, 'iftp_gf_payment_status', 'pending' );
-
 		gform_update_meta( $entry_id, 'iftp_gf_payment_amount', $amount );
+
 		\GFAPI::update_entry_property( $entry_id, 'payment_amount', $amount );
-
 		\GFAPI::update_entry_property( $entry_id, 'payment_status', 'Processing' );
-
-		$this->log_debug( __METHOD__ . "(): Entry #{$entry_id} → redirect to ifthenpay. TxID: {$transaction_id}" );
 
 		return $redirect_url;
 	}
@@ -1015,10 +895,10 @@ class Addon extends \GFPaymentAddOn {
 	 */
 	public function get_competing_payment_addon_slugs( int $form_id ): array {
 		if ( $form_id <= 0 || ! class_exists( '\GFPaymentAddOn' ) ) {
-			return [];
+			return array();
 		}
 
-		$competing = [];
+		$competing = array();
 
 		foreach ( \GFAddOn::get_registered_addons( true ) as $addon ) {
 			if ( ! $addon instanceof \GFPaymentAddOn ) {
@@ -1044,7 +924,7 @@ class Addon extends \GFPaymentAddOn {
 	 * @return array
 	 */
 	public function enforce_single_payment_gateway( $validation_result ): array {
-		$form    = $validation_result['form'] ?? [];
+		$form    = $validation_result['form'] ?? array();
 		$form_id = (int) rgar( $form, 'id' );
 
 		if ( $form_id <= 0 ) {
@@ -1059,9 +939,9 @@ class Addon extends \GFPaymentAddOn {
 
 
 		$entry = \GFFormsModel::get_current_lead( $form );
-		foreach ( $form['fields'] ?? [] as $field ) {
+		foreach ( $form['fields'] ?? array() as $field ) {
 			if ( isset( $field->type ) && $field->type === 'iftp_pbl' ) {
-				if ( \GFFormsModel::is_field_hidden( $form, $field, [], $entry ) ) {
+				if ( \GFFormsModel::is_field_hidden( $form, $field, array(), $entry ) ) {
 					return $validation_result;
 				}
 				break;
@@ -1080,7 +960,7 @@ class Addon extends \GFPaymentAddOn {
 
 		$form_info      = self::get_form_payment_info( $form_id );
 		$active_methods = array_filter(
-			(array) ( $form_info['pay_methods'] ?? [] ),
+			(array) ( $form_info['pay_methods'] ?? array() ),
 			static fn( array $m ): bool => ! empty( $m['is_active'] )
 		);
 		if ( empty( $active_methods ) ) {
@@ -1130,7 +1010,7 @@ class Addon extends \GFPaymentAddOn {
 	private function fail_validation_on_field( array $validation_result, array $form, string $message ): array {
 		$validation_result['is_valid'] = false;
 
-		foreach ( $form['fields'] ?? [] as &$field ) {
+		foreach ( $form['fields'] ?? array() as &$field ) {
 			if ( isset( $field->type ) && $field->type === 'iftp_pbl' ) {
 				$field->failed_validation  = true;
 				$field->validation_message = $message;
@@ -1144,96 +1024,104 @@ class Addon extends \GFPaymentAddOn {
 	}
 
 	/**
-	 * Filter: gform_get_form_filter
+	 * Action: wp (priority 5, same pattern as GF Stripe's maybe_thankyou_page)
 	 *
-	 * After the gateway return handler redirects the customer back to the form
-	 * page with ?iftp_gf_status=paid|failed|cancelled, this prepends a styled
-	 * notice above the form HTML — same UX pattern as GF Stripe / WooCommerce
-	 * showing a "Payment received" / "Payment failed" banner after checkout.
+	 * Pre-populates GFFormDisplay::$submission so that when GF renders the form
+	 * on this page it naturally shows the confirmation or validation-error state —
+	 * fully styled and accessible using GF's own CSS and markup pipeline.
 	 *
-	 * Only renders on forms that actually have an active ifthenpay feed, so we
-	 * don't pollute unrelated forms when multiple forms share a page.
-	 *
-	 * @param string $form_string The form's rendered HTML.
-	 * @param array  $form        The GF form object.
-	 * @return string
+	 * Must run on 'wp' (not template_redirect): confirmation page-redirects call
+	 * get_permalink() which requires WP's query object to be set up; triggering it
+	 * earlier throws a PHP fatal error (same reason GF Stripe uses 'wp').
 	 */
-	public function inject_payment_status_banner( $form_string, $form ): string {
-		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- gateway return flash; not processing form data
-		if ( empty( $_GET['iftp_gf_status'] ) ) {
-			return $form_string;
+	public function setup_submission_state(): void {
+		if ( ! $this->is_gravityforms_supported() ) {
+			return;
 		}
 
-		$form_id = (int) rgar( $form, 'id' );
-		if ( $form_id <= 0 || empty( $this->get_active_feeds( $form_id ) ) ) {
-			return $form_string;
-		}
-
-		$status = sanitize_key( wp_unslash( (string) $_GET['iftp_gf_status'] ) );
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- gateway flash; no form data processed
+		$status   = isset( $_GET['iftp_gf_status'] ) ? sanitize_key( wp_unslash( (string) $_GET['iftp_gf_status'] ) ) : '';
+		$entry_id = isset( $_GET['iftp_gf_entry'] ) ? absint( $_GET['iftp_gf_entry'] ) : 0;
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
+		if ( $entry_id <= 0 || ! in_array( $status, array( 'paid', 'pending', 'failed', 'cancelled' ), true ) ) {
+			return;
+		}
 
-		if ( ! wp_style_is( 'ifthenpay-gf-frontend', 'enqueued' ) ) {
-			wp_enqueue_style(
-				'ifthenpay-gf-frontend',
-				\IFTP_GF_URL . 'assets/css/frontend.css',
-				[],
-				\IFTP_GF_VERSION
+		$entry = \GFAPI::get_entry( $entry_id );
+		if ( is_wp_error( $entry ) || ! is_array( $entry ) ) {
+			return;
+		}
+
+		$form_id = (int) $entry['form_id'];
+		$form    = \GFAPI::get_form( $form_id );
+		if ( ! is_array( $form ) || empty( $this->get_active_feeds( $form_id ) ) ) {
+			return;
+		}
+
+		if ( ! class_exists( 'GFFormDisplay' ) ) {
+			require_once \GFCommon::get_base_path() . '/form_display.php';
+		}
+
+
+		if ( in_array( $status, array( 'paid', 'pending' ), true ) ) {
+			$confirmation = \GFFormDisplay::handle_confirmation( $form, $entry, false );
+
+			if ( is_array( $confirmation ) && ! empty( $confirmation['redirect'] ) ) {
+				wp_safe_redirect( esc_url_raw( $confirmation['redirect'] ) );
+				exit;
+			}
+
+			\GFFormDisplay::$submission[ $form_id ] = array(
+				'is_confirmation'      => true,
+				'confirmation_message' => $confirmation,
+				'form'                 => $form,
+				'lead'                 => $entry,
 			);
+
+			return;
 		}
 
 
-		$banners = [
-			'paid'      => [
-				'variant' => 'success',
-				'svg'     => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" width="20" height="20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/></svg>',
-				'title'   => __( 'Payment received', 'ifthenpay-payments-for-gravityforms' ),
-				'body'    => __( 'Thank you — your payment has been confirmed and the form was submitted successfully.', 'ifthenpay-payments-for-gravityforms' ),
-			],
-			'pending'   => [
-				'variant' => 'info',
-				'svg'     => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" width="20" height="20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clip-rule="evenodd"/></svg>',
-				'title'   => __( 'Awaiting payment confirmation', 'ifthenpay-payments-for-gravityforms' ),
-				'body'    => __( 'Your payment reference has been generated. The form will be confirmed automatically once ifthenpay receives the payment — you can close this page in the meantime.', 'ifthenpay-payments-for-gravityforms' ),
-			],
-			'failed'    => [
-				'variant' => 'error',
-				'svg'     => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" width="20" height="20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/></svg>',
-				'title'   => __( 'Payment failed', 'ifthenpay-payments-for-gravityforms' ),
-				'body'    => __( 'Something went wrong! Your payment was not processed. Please submit the form again to retry.', 'ifthenpay-payments-for-gravityforms' ),
-			],
-			'cancelled' => [
-				'variant' => 'cancel',
-				'svg'     => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" width="20" height="20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>',
-				'title'   => __( 'Payment cancelled', 'ifthenpay-payments-for-gravityforms' ),
-				'body'    => __( 'You cancelled the payment before it was completed. Submit the form again if you want to try a different method.', 'ifthenpay-payments-for-gravityforms' ),
-			],
-		];
 
-		if ( ! isset( $banners[ $status ] ) ) {
-			return $form_string;
+
+		$existing_meta = (string) gform_get_meta( $entry_id, 'iftp_gf_payment_status' );
+		if ( ! in_array( $existing_meta, array( 'paid', 'failed', 'cancelled' ), true ) ) {
+			$gf_status = $status === 'cancelled' ? 'Cancelled' : 'Failed';
+			\GFAPI::update_entry_property( $entry_id, 'payment_status', $gf_status );
+			gform_update_meta( $entry_id, 'iftp_gf_payment_status', $status );
 		}
 
-		$b         = $banners[ $status ];
-		$icon_span = '<span class="iftp-gf-return-notice__icon" aria-hidden="true">' . $b['svg'] . '</span>';
-
-		$role = in_array( $b['variant'], [ 'error', 'cancel' ], true ) ? 'alert' : 'status';
-		$live = in_array( $b['variant'], [ 'error', 'cancel' ], true ) ? 'assertive' : 'polite';
-
-		$banner = sprintf(
-			'<div class="iftp-gf-return-notice iftp-gf-return-notice--%1$s" role="%5$s" aria-live="%6$s" tabindex="-1">'
-			. '%2$s'
-			. '<div class="iftp-gf-return-notice__text"><strong class="iftp-gf-return-notice__title">%3$s</strong><p class="iftp-gf-return-notice__body">%4$s</p></div>'
-			. '</div>',
-			esc_attr( $b['variant'] ),
-			$icon_span,
-			esc_html( $b['title'] ),
-			esc_html( $b['body'] ),
-			$role,
-			$live
+		$messages = array(
+			'failed'    => __( 'Payment failed. Please submit the form again to retry.', 'ifthenpay-payments-for-gravityforms' ),
+			'cancelled' => __( 'Payment cancelled. Submit the form again if you wish to try a different method.', 'ifthenpay-payments-for-gravityforms' ),
 		);
 
-		return $banner . $form_string;
+		$error_from_meta = (string) gform_get_meta( $entry_id, 'iftp_gf_error_message' );
+		$msg             = ( $status === 'failed' && $error_from_meta !== '' )
+			? $error_from_meta
+			: ( $messages[ $status ] ?? '' );
+
+		$error_h2 = sprintf(
+			'<h2 class="gform_submission_error"><span class="gform-icon gform-icon--circle-error"></span>%s</h2>',
+			esc_html( $msg )
+		);
+
+
+		add_filter(
+			'gform_validation_message_' . $form_id,
+			static function ( $default_h2, $f ) use ( $error_h2 ) {
+				return $error_h2;
+			},
+			10,
+			2
+		);
+
+		\GFFormDisplay::$submission[ $form_id ] = array(
+			'is_valid' => false,
+			'form'     => $form,
+			'lead'     => array(),
+		);
 	}
 
 
@@ -1241,6 +1129,14 @@ class Addon extends \GFPaymentAddOn {
 	// phpcs:disable WordPress.Security.NonceVerification.Recommended -- server-to-server callback validated by entry-meta crosscheck
 	public function callback() {
 		$_GET = wp_unslash( $_GET );
+
+		$request_uri = isset( $_SERVER['REQUEST_URI'] )
+			? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) )
+			: '';
+		if ( ! str_contains( $request_uri, self::CALLBACK_PATH ) ) {
+			status_header( 404 );
+			exit( 'Not Found' );
+		}
 
 		$request_method = isset( $_SERVER['REQUEST_METHOD'] )
 			? strtoupper( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) )
@@ -1262,16 +1158,18 @@ class Addon extends \GFPaymentAddOn {
 			exit( 'Entry not found' );
 		}
 
+		$amount = (float) gform_get_meta( $ref, 'iftp_gf_payment_amount' );
+
 
 		if ( ! empty( $_GET['status'] ) ) {
 			$status = sanitize_text_field( wp_unslash( (string) $_GET['status'] ) );
-			if ( ! in_array( $status, [ 'cancelled', 'error' ], true ) ) {
+			if ( ! in_array( $status, array( 'cancelled', 'error' ), true ) ) {
 				status_header( 400 );
 				exit( 'Invalid status' );
 			}
 
 			$existing = (string) gform_get_meta( $ref, 'iftp_gf_payment_status' );
-			if ( in_array( $existing, [ 'failed', 'cancelled', 'paid' ], true ) ) {
+			if ( in_array( $existing, array( 'failed', 'cancelled', 'paid' ), true ) ) {
 				status_header( 200 );
 				exit( 'OK (idempotent)' );
 			}
@@ -1279,7 +1177,7 @@ class Addon extends \GFPaymentAddOn {
 			$amount = (float) gform_get_meta( $ref, 'iftp_gf_payment_amount' );
 			$txid   = (string) gform_get_meta( $ref, 'iftp_gf_transaction_id' );
 
-			return [
+			return array(
 				'type'           => 'fail_payment',
 				'entry_id'       => $ref,
 				'amount'         => $amount,
@@ -1288,11 +1186,11 @@ class Addon extends \GFPaymentAddOn {
 				'note'           => $status === 'cancelled'
 					? esc_html__( 'Payment cancelled at the ifthenpay gateway (server-side callback).', 'ifthenpay-payments-for-gravityforms' )
 					: esc_html__( 'Payment failed at the ifthenpay gateway (server-side callback).', 'ifthenpay-payments-for-gravityforms' ),
-			];
+			);
 		}
 
 
-		foreach ( [ 'apk', 'val' ] as $required ) {
+		foreach ( array( 'apk', 'val' ) as $required ) {
 			if ( ! isset( $_GET[ $required ] ) ) {
 				status_header( 400 );
 				exit( 'Missing ' . esc_html( $required ) );
@@ -1304,8 +1202,8 @@ class Addon extends \GFPaymentAddOn {
 		// phpcs:enable WordPress.Security.ValidatedSanitizedInput.InputNotValidated
 
 
-		$expected_gateway  = (string) gform_get_meta( $ref, 'iftp_gf_gateway_key' );
-		$expected_apk      = base64_encode( $expected_gateway ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+		$expected_gateway = (string) gform_get_meta( $ref, 'iftp_gf_gateway_key' );
+		$expected_apk     = base64_encode( $expected_gateway ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 		if ( $expected_gateway === '' || $apk !== $expected_apk ) {
 			status_header( 403 );
 			exit( 'apk mismatch' );
@@ -1325,14 +1223,14 @@ class Addon extends \GFPaymentAddOn {
 			exit( 'amount mismatch' );
 		}
 
-		return [
+		return array(
 			'type'             => 'complete_payment',
 			'entry_id'         => $ref,
 			'amount'           => $expected_amount,
 			'transaction_id'   => 'IFTP-' . $ref,
 			'payment_date'     => gmdate( 'Y-m-d H:i:s' ),
 			'transaction_type' => 'payment',
-		];
+		);
 	}
 	// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
@@ -1375,7 +1273,7 @@ class Addon extends \GFPaymentAddOn {
 
 
 		$existing = (string) gform_get_meta( $entry_id, 'iftp_gf_payment_status' );
-		if ( in_array( $existing, [ 'paid', 'failed', 'cancelled' ], true ) ) {
+		if ( in_array( $existing, array( 'paid', 'failed', 'cancelled' ), true ) ) {
 			$this->redirect_after_return( $entry, $existing );
 			return;
 		}
@@ -1385,7 +1283,7 @@ class Addon extends \GFPaymentAddOn {
 
 		$flash = match ( true ) {
 			$status === 'success'                                              => 'pending',
-			in_array( $status, [ 'cancel', 'cancelled', 'canceled' ], true ) => 'cancelled',
+			in_array( $status, array( 'cancel', 'cancelled', 'canceled' ), true ) => 'cancelled',
 			$status === 'error'                                                => 'failed',
 			default                                                            => '',
 		};
@@ -1394,10 +1292,10 @@ class Addon extends \GFPaymentAddOn {
 	}
 
 	/**
-	 * Clean-redirect after a gateway return: strip the iftp_gf_* gateway args
-	 * from the original source URL so a refresh doesn't re-trigger the handler,
-	 * then re-append a single `iftp_gf_status` flash param so the next page render
-	 * can display a Stripe-style payment-result banner above the form.
+	 * Clean-redirect after a gateway return: strip the payment gateway args, then
+	 * append a status flash + the entry ID. The entry ID lets setup_submission_state()
+	 * (on 'wp' action) know exactly which form to pre-load without having to scan the
+	 * page content for shortcodes.
 	 */
 	private function redirect_after_return( array $entry, string $flash = '' ): void {
 		$source_url = (string) rgar( $entry, 'source_url' );
@@ -1405,9 +1303,16 @@ class Addon extends \GFPaymentAddOn {
 			$source_url = home_url( '/' );
 		}
 
-		$clean = remove_query_arg( [ 'iftp_gf_pay', 'id', 'transaction_id', 'iftp_gateway' ], $source_url );
-		if ( in_array( $flash, [ 'paid', 'failed', 'cancelled', 'pending' ], true ) ) {
-			$clean = add_query_arg( 'iftp_gf_status', $flash, $clean );
+		$clean = remove_query_arg( array( 'iftp_gf_pay', 'id', 'transaction_id', 'iftp_gateway' ), $source_url );
+
+		if ( in_array( $flash, array( 'paid', 'pending', 'failed', 'cancelled' ), true ) ) {
+			$clean = add_query_arg(
+				array(
+					'iftp_gf_status' => $flash,
+					'iftp_gf_entry'  => (int) rgar( $entry, 'id' ),
+				),
+				$clean
+			);
 		}
 
 		wp_safe_redirect( esc_url_raw( $clean ) );
@@ -1420,7 +1325,7 @@ class Addon extends \GFPaymentAddOn {
 		check_ajax_referer( 'iftp_gf_admin', 'nonce' );
 
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'ifthenpay-payments-for-gravityforms' ) ], 403 );
+			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'ifthenpay-payments-for-gravityforms' ) ), 403 );
 		}
 
 		$backoffice_key = isset( $_POST['backoffice_key'] )
@@ -1428,51 +1333,58 @@ class Addon extends \GFPaymentAddOn {
 			: '';
 
 		if ( $backoffice_key === '' || preg_match( '/^\*+$/', $backoffice_key ) ) {
-			wp_send_json_error( [ 'message' => __( 'Enter a valid Backoffice Key before connecting.', 'ifthenpay-payments-for-gravityforms' ) ], 400 );
+			wp_send_json_error( array( 'message' => __( 'Enter a valid Backoffice Key before connecting.', 'ifthenpay-payments-for-gravityforms' ) ), 400 );
 		}
 
 		if ( ! preg_match( '/^\d{4}-\d{4}-\d{4}-\d{4}$/', $backoffice_key ) ) {
-			wp_send_json_error( [ 'message' => __( 'Invalid Backoffice Key format.', 'ifthenpay-payments-for-gravityforms' ) ], 400 );
+			wp_send_json_error( array( 'message' => __( 'Invalid Backoffice Key format.', 'ifthenpay-payments-for-gravityforms' ) ), 400 );
 		}
 
 
 		try {
-			$gateway_rows = ( new IfthenpayClient( $backoffice_key ) )->get_gateway_keys(self::GATEWAY_TYPE);
+			$gateway_rows = ( new IfthenpayClient( $backoffice_key ) )->get_gateway_keys( self::GATEWAY_TYPE );
 		} catch ( \Throwable ) {
-			$gateway_rows = [];
+			$gateway_rows = array();
 		}
 
 		if ( empty( $gateway_rows ) ) {
-			wp_send_json_error( [
-				'message' => sprintf(
-					__( 'No gateway found for this backoffice key. If you are a client, request one. Otherwise, contact Ifthenpay to become one.', 'ifthenpay-payments-for-gravityforms' ),
+			wp_send_json_error(
+				array(
+					'message' => sprintf(
+						__( 'No gateway found for this backoffice key. If you are a client, request one. Otherwise, contact Ifthenpay to become one.', 'ifthenpay-payments-for-gravityforms' ),
+					),
 				),
-			], 400 );
+				400
+			);
 		}
 
 		update_option( self::OPTION_BACKOFFICE_KEY, $backoffice_key, false );
 
-		wp_send_json_success( [
-			'message'     => __( 'Backoffice Key connected successfully.', 'ifthenpay-payments-for-gravityforms' ),
-			'masked_key'  => str_repeat( '*', 18 ),
-			'status_html' => $this->render_connection_card_html(),
-		] );
+		wp_send_json_success(
+			array(
+				'message'     => __( 'Backoffice Key connected successfully.', 'ifthenpay-payments-for-gravityforms' ),
+				'masked_key'  => str_repeat( '*', 18 ),
+				'status_html' => $this->render_connection_card_html(),
+			)
+		);
 	}
 
 	public function ajax_disconnect_backoffice(): void {
 		check_ajax_referer( 'iftp_gf_admin', 'nonce' );
 
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'ifthenpay-payments-for-gravityforms' ) ], 403 );
+			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'ifthenpay-payments-for-gravityforms' ) ), 403 );
 		}
 
 		delete_option( self::OPTION_BACKOFFICE_KEY );
 		FormPaymentInfo::delete_all();
 
-		wp_send_json_success( [
-			'message'     => __( 'Backoffice Key disconnected.', 'ifthenpay-payments-for-gravityforms' ),
-			'status_html' => $this->render_connection_card_html(),
-		] );
+		wp_send_json_success(
+			array(
+				'message'     => __( 'Backoffice Key disconnected.', 'ifthenpay-payments-for-gravityforms' ),
+				'status_html' => $this->render_connection_card_html(),
+			)
+		);
 	}
 
 
@@ -1481,12 +1393,12 @@ class Addon extends \GFPaymentAddOn {
 		check_ajax_referer( 'iftp_gf_admin', 'nonce' );
 
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'ifthenpay-payments-for-gravityforms' ) ], 403 );
+			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'ifthenpay-payments-for-gravityforms' ) ), 403 );
 		}
 
 		$gateway_key = sanitize_text_field( wp_unslash( (string) ( $_POST['gateway_key'] ?? '' ) ) );
 
-		$table_html = $this->render_methods_table_inner( $gateway_key, [] );
+		$table_html = $this->render_methods_table_inner( $gateway_key, array() );
 
 
 		$default_options = '<option value="">' . esc_html__( '— Auto (first enabled method) —', 'ifthenpay-payments-for-gravityforms' ) . '</option>';
@@ -1505,10 +1417,12 @@ class Addon extends \GFPaymentAddOn {
 			}
 		}
 
-		wp_send_json_success( [
-			'table_html'      => $table_html,
-			'default_options' => $default_options,
-		] );
+		wp_send_json_success(
+			array(
+				'table_html'      => $table_html,
+				'default_options' => $default_options,
+			)
+		);
 	}
 
 
@@ -1517,38 +1431,40 @@ class Addon extends \GFPaymentAddOn {
 		check_ajax_referer( 'iftp_gf_admin', 'nonce' );
 
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( [], 403 );
+			wp_send_json_error( array(), 403 );
 		}
 
 		$entity      = strtoupper( sanitize_text_field( wp_unslash( (string) ( $_POST['entity'] ?? '' ) ) ) );
 		$gateway_key = sanitize_text_field( wp_unslash( (string) ( $_POST['gateway_key'] ?? '' ) ) );
 
 		if ( $entity === '' || $gateway_key === '' ) {
-			wp_send_json_error( [ 'message' => __( 'Missing entity or gateway key.', 'ifthenpay-payments-for-gravityforms' ) ], 400 );
+			wp_send_json_error( array( 'message' => __( 'Missing entity or gateway key.', 'ifthenpay-payments-for-gravityforms' ) ), 400 );
 		}
 
 		$cooldown_key = 'iftp_gf_activation_' . md5( $gateway_key . '_' . $entity );
 		if ( get_transient( $cooldown_key ) ) {
-			wp_send_json_error( [ 'message' => __( 'Activation request already sent. Please wait 24 hours before requesting again.', 'ifthenpay-payments-for-gravityforms' ) ], 429 );
+			wp_send_json_error( array( 'message' => __( 'Activation request already sent. Please wait 24 hours before requesting again.', 'ifthenpay-payments-for-gravityforms' ) ), 429 );
 		}
 
 		$current_user = wp_get_current_user();
 
-		IfthenpayEmailHelper::send_activation_email( [
-			'gateway_key'    => $gateway_key,
-			'entity'         => $entity,
-			'backoffice_key' => self::get_backoffice_key(),
-			'customer_email' => $current_user->user_email,
-			'site_url'       => home_url( '/' ),
-			'site_name'      => get_bloginfo( 'name' ),
-			'wp_version'     => get_bloginfo( 'version' ),
-			'gf_version'     => \GFCommon::$version ?? '',
-			'plugin_version' => \IFTP_GF_VERSION,
-		] );
+		IfthenpayEmailHelper::send_activation_email(
+			array(
+				'gateway_key'    => $gateway_key,
+				'entity'         => $entity,
+				'backoffice_key' => self::get_backoffice_key(),
+				'customer_email' => $current_user->user_email,
+				'site_url'       => home_url( '/' ),
+				'site_name'      => get_bloginfo( 'name' ),
+				'wp_version'     => get_bloginfo( 'version' ),
+				'gf_version'     => \GFCommon::$version ?? '',
+				'plugin_version' => \IFTP_GF_VERSION,
+			)
+		);
 
 		set_transient( $cooldown_key, 1, DAY_IN_SECONDS );
 
-		wp_send_json_success( [ 'message' => __( 'Activation request sent to ifthenpay support.', 'ifthenpay-payments-for-gravityforms' ) ] );
+		wp_send_json_success( array( 'message' => __( 'Activation request sent to ifthenpay support.', 'ifthenpay-payments-for-gravityforms' ) ) );
 	}
 
 
@@ -1560,13 +1476,13 @@ class Addon extends \GFPaymentAddOn {
 		?>
 		<div id="iftp-gf-connection-status-card">
 			<?php if ( $is_connected ) : ?>
-			<div class="alert gforms_note_success">
-				<h4><?php esc_html_e( 'Connected', 'ifthenpay-payments-for-gravityforms' ); ?></h4>
-				<p><?php esc_html_e( 'Your Backoffice Key is connected. Open any form\'s Settings → ifthenpay to configure gateway keys and payment methods.', 'ifthenpay-payments-for-gravityforms' ); ?></p>
-				<button type="button" id="iftp-gf-disconnect-backoffice" class="button button-secondary">
-					<?php esc_html_e( 'Disconnect', 'ifthenpay-payments-for-gravityforms' ); ?>
-				</button>
-			</div>
+				<div class="alert gforms_note_success">
+					<h4><?php esc_html_e( 'Connected', 'ifthenpay-payments-for-gravityforms' ); ?></h4>
+					<p><?php esc_html_e( 'Your Backoffice Key is connected. Open any form\'s Settings → ifthenpay to configure gateway keys and payment methods.', 'ifthenpay-payments-for-gravityforms' ); ?></p>
+					<button type="button" id="iftp-gf-disconnect-backoffice" class="button button-secondary">
+						<?php esc_html_e( 'Disconnect', 'ifthenpay-payments-for-gravityforms' ); ?>
+					</button>
+				</div>
 			<?php endif; ?>
 		</div>
 		<?php
@@ -1576,7 +1492,7 @@ class Addon extends \GFPaymentAddOn {
 
 
 	public static function get_backoffice_key(): string {
-		return trim( (string) get_option( self::OPTION_BACKOFFICE_KEY, '' ) );
+		return (string) get_option( self::OPTION_BACKOFFICE_KEY, '' );
 	}
 
 
@@ -1594,7 +1510,7 @@ class Addon extends \GFPaymentAddOn {
 
 		$backoffice_key = self::get_backoffice_key();
 		if ( $backoffice_key === '' ) {
-			$rows = [];
+			$rows = array();
 			return $rows;
 		}
 
@@ -1602,7 +1518,7 @@ class Addon extends \GFPaymentAddOn {
 			$rows = ( new IfthenpayClient( $backoffice_key ) )->get_gateway_keys( self::GATEWAY_TYPE );
 		} catch ( \Throwable $e ) {
 			$this->log_error( __METHOD__ . '(): ' . $e->getMessage() );
-			$rows = [];
+			$rows = array();
 		}
 
 		return $rows;
@@ -1625,17 +1541,17 @@ class Addon extends \GFPaymentAddOn {
 			$raw = IfthenpayClient::get_available_methods();
 		} catch ( \Throwable $e ) {
 			$this->log_error( __METHOD__ . '(): ' . $e->getMessage() );
-			$keyed = [];
+			$keyed = array();
 			return $keyed;
 		}
 
-		$keyed = [];
+		$keyed = array();
 		foreach ( $raw as $method ) {
 			if ( empty( $method['Entity'] ) || empty( $method['IsVisible'] ) ) {
 				continue;
 			}
 			$entity           = strtoupper( (string) $method['Entity'] );
-			$keyed[ $entity ] = [
+			$keyed[ $entity ] = array(
 				'entity'                => $entity,
 				'label'                 => (string) ( $method['Method'] ?? $entity ),
 				'image_url'             => (string) ( $method['ImageUrl'] ?? '' ),
@@ -1643,7 +1559,7 @@ class Addon extends \GFPaymentAddOn {
 				'small_image_url_dark'  => (string) ( $method['SmallImageUrlDark'] ?? '' ),
 				'position'              => (int) ( $method['Position'] ?? 0 ),
 				'allow_selected_method' => (bool) ( $method['AllowSelectedMethod'] ?? true ),
-			];
+			);
 		}
 
 		uasort( $keyed, static fn( array $a, array $b ): int => $a['position'] <=> $b['position'] );
@@ -1673,14 +1589,18 @@ class Addon extends \GFPaymentAddOn {
 	 * casing variant of the Entity / Method names.
 	 */
 	private function resolve_account_in_row( array $row, string $entity, string $method_label = '' ): string {
-		$candidates = array_unique( array_filter( [
-			$entity,
-			strtoupper( $entity ),
-			strtolower( $entity ),
-			$method_label,
-			strtoupper( $method_label ),
-			strtolower( $method_label ),
-		] ) );
+		$candidates = array_unique(
+			array_filter(
+				array(
+					$entity,
+					strtoupper( $entity ),
+					strtolower( $entity ),
+					$method_label,
+					strtoupper( $method_label ),
+					strtolower( $method_label ),
+				)
+			)
+		);
 
 
 		if ( strtoupper( $entity ) === 'MB' || strtoupper( $method_label ) === 'MULTIBANCO' ) {
@@ -1707,7 +1627,12 @@ class Addon extends \GFPaymentAddOn {
 	 * Label = alias (or key as fallback); value = the technical key.
 	 */
 	private function get_gateway_key_choices(): array {
-		$choices = [ [ 'label' => __( '— Select a gateway key —', 'ifthenpay-payments-for-gravityforms' ), 'value' => '' ] ];
+		$choices = array(
+			array(
+				'label' => __( '— Select a gateway key —', 'ifthenpay-payments-for-gravityforms' ),
+				'value' => '',
+			),
+		);
 
 		foreach ( $this->fetch_gravityforms_gateways() as $row ) {
 			$key = sanitize_text_field( (string) ( $row['GatewayKey'] ?? '' ) );
@@ -1715,10 +1640,10 @@ class Addon extends \GFPaymentAddOn {
 				continue;
 			}
 			$alias     = sanitize_text_field( (string) ( $row['Alias'] ?? '' ) );
-			$choices[] = [
+			$choices[] = array(
 				'label' => $alias !== '' ? $alias : $key,
 				'value' => $key,
-			];
+			);
 		}
 
 		return $choices;
@@ -1733,7 +1658,12 @@ class Addon extends \GFPaymentAddOn {
 	 * disables the options whose entity isn't currently is_active=true.
 	 */
 	private function get_default_method_choices(): array {
-		$choices = [ [ 'label' => __( '— Auto (first enabled method) —', 'ifthenpay-payments-for-gravityforms' ), 'value' => '' ] ];
+		$choices = array(
+			array(
+				'label' => __( '— Auto (first enabled method) —', 'ifthenpay-payments-for-gravityforms' ),
+				'value' => '',
+			),
+		);
 
 		$gateway_key = (string) ( $this->get_setting( 'gateway_key' ) ?? '' );
 		if ( $gateway_key === '' ) {
@@ -1750,10 +1680,10 @@ class Addon extends \GFPaymentAddOn {
 			if ( $account === '' ) {
 				continue;
 			}
-			$choices[] = [
+			$choices[] = array(
 				'label' => (string) ( $cat_entry['label'] ?? $entity ),
 				'value' => $entity,
-			];
+			);
 		}
 
 		return $choices;
@@ -1779,8 +1709,8 @@ class Addon extends \GFPaymentAddOn {
 		if ( $allowed === null ) {
 			$allowed = array_merge(
 				wp_kses_allowed_html( 'post' ),
-				[
-					'input'  => [
+				array(
+					'input'  => array(
 						'type'         => true,
 						'id'           => true,
 						'class'        => true,
@@ -1793,20 +1723,20 @@ class Addon extends \GFPaymentAddOn {
 						'aria-label'   => true,
 						'autocomplete' => true,
 						'aria-live'    => true,
-					],
-					'select' => [
-						'id'           => true,
-						'class'        => true,
-						'name'         => true,
-						'data-nonce'   => true,
-						'data-entity'  => true,
-					],
-					'option' => [
+					),
+					'select' => array(
+						'id'          => true,
+						'class'       => true,
+						'name'        => true,
+						'data-nonce'  => true,
+						'data-entity' => true,
+					),
+					'option' => array(
 						'value'    => true,
 						'selected' => true,
 						'disabled' => true,
-					],
-					'button' => [
+					),
+					'button' => array(
 						'type'             => true,
 						'id'               => true,
 						'class'            => true,
@@ -1814,31 +1744,51 @@ class Addon extends \GFPaymentAddOn {
 						'data-gateway-key' => true,
 						'disabled'         => true,
 						'aria-label'       => true,
-					],
-					'label'  => [
+					),
+					'label'  => array(
 						'class' => true,
 						'for'   => true,
-					],
-					'img'    => [
+					),
+					'img'    => array(
 						'src'     => true,
 						'alt'     => true,
 						'loading' => true,
 						'class'   => true,
-					],
-					'table'  => [ 'class' => true ],
-					'thead'  => [],
-					'tbody'  => [],
-					'tr'     => [],
-					'th'     => [],
-					'td'     => [],
-					'h4'     => [ 'style' => true ],
-					'div'    => [ 'id' => true, 'class' => true, 'style' => true, 'data-nonce' => true ],
-					'span'   => [ 'id' => true, 'class' => true, 'style' => true, 'title' => true, 'aria-live' => true ],
-					'p'      => [ 'class' => true, 'style' => true ],
-					'em'     => [ 'class' => true ],
-					'code'   => [ 'class' => true ],
-					'a'      => [ 'href' => true, 'class' => true, 'target' => true, 'rel' => true, 'id' => true ],
-				]
+					),
+					'table'  => array( 'class' => true ),
+					'thead'  => array(),
+					'tbody'  => array(),
+					'tr'     => array(),
+					'th'     => array(),
+					'td'     => array(),
+					'h4'     => array( 'style' => true ),
+					'div'    => array(
+						'id'         => true,
+						'class'      => true,
+						'style'      => true,
+						'data-nonce' => true,
+					),
+					'span'   => array(
+						'id'        => true,
+						'class'     => true,
+						'style'     => true,
+						'title'     => true,
+						'aria-live' => true,
+					),
+					'p'      => array(
+						'class' => true,
+						'style' => true,
+					),
+					'em'     => array( 'class' => true ),
+					'code'   => array( 'class' => true ),
+					'a'      => array(
+						'href'   => true,
+						'class'  => true,
+						'target' => true,
+						'rel'    => true,
+						'id'     => true,
+					),
+				)
 			);
 		}
 

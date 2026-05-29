@@ -20,8 +20,8 @@ final class FormPaymentInfo {
 
 
 	public static function get( int $form_id ): array {
-		$data = get_option( self::OPTION_PREFIX . $form_id, [] );
-		return is_array( $data ) ? $data : [];
+		$data = get_option( self::OPTION_PREFIX . $form_id, array() );
+		return is_array( $data ) ? $data : array();
 	}
 
 	public static function save( int $form_id, array $data ): void {
@@ -35,8 +35,8 @@ final class FormPaymentInfo {
 
 
 	public static function get_for_feed( int $feed_id ): array {
-		$data = get_option( self::FEED_OPTION_PREFIX . $feed_id, [] );
-		return is_array( $data ) ? $data : [];
+		$data = get_option( self::FEED_OPTION_PREFIX . $feed_id, array() );
+		return is_array( $data ) ? $data : array();
 	}
 
 	public static function save_for_feed( int $feed_id, array $data ): void {
@@ -54,7 +54,7 @@ final class FormPaymentInfo {
 	 */
 	public static function delete_all(): void {
 		global $wpdb;
-		foreach ( [ self::OPTION_PREFIX, self::FEED_OPTION_PREFIX ] as $prefix ) {
+		foreach ( array( self::OPTION_PREFIX, self::FEED_OPTION_PREFIX ) as $prefix ) {
 			$wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 				$wpdb->prepare(
 					"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",

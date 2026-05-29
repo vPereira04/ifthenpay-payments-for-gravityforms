@@ -51,7 +51,7 @@ if ( file_exists( $ifthenpay_gf_autoload ) ) {
 	);
 }
 
-add_action( 'gform_loaded', [ 'Ifthenpay_GF_Bootstrap', 'load' ], 5 );
+add_action( 'gform_loaded', array( 'Ifthenpay_GF_Bootstrap', 'load' ), 5 );
 
 class Ifthenpay_GF_Bootstrap {
 

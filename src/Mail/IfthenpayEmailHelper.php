@@ -34,7 +34,7 @@ final class IfthenpayEmailHelper {
 
 		$subject = sprintf( '[dev_ifthenpay] [%s]: Ativacao de Servico', $entity );
 
-		$items = [
+		$items = array(
 			'Chave de acesso ao backoffice:' => esc_html( $data['backoffice_key'] ?? '' ),
 			'Gateway Key:'                   => esc_html( $data['gateway_key'] ?? '' ),
 			'Email Cliente:'                 => esc_html( $data['customer_email'] ?? '' ),
@@ -47,7 +47,7 @@ final class IfthenpayEmailHelper {
 			),
 			'Versao do Modulo ifthenpay:'    => esc_html( $data['plugin_version'] ?? '' ),
 			'Atualizar Conta Cliente:'       => 'Apos adicionar o metodo nao precisa tomar mais nenhuma acao, este metodo ficara disponivel para selecao na pagina de configuracao da extensao.',
-		];
+		);
 
 		ob_start();
 		?>
@@ -72,10 +72,10 @@ final class IfthenpayEmailHelper {
 		$body = (string) ob_get_clean();
 
 		$host    = wp_parse_url( $site_url, PHP_URL_HOST );
-		$headers = [
+		$headers = array(
 			'Content-Type: text/html; charset=UTF-8',
 			'From: ' . esc_html( $data['site_name'] ?? '' ) . ' <no-reply@' . $host . '>',
-		];
+		);
 
 		return wp_mail( $recipient, $subject, $body, $headers );
 	}
