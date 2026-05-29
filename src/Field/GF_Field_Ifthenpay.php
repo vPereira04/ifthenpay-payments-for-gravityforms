@@ -199,14 +199,12 @@ class GF_Field_Ifthenpay extends \GF_Field {
 
 		switch ( $status ) {
 			case 'paid':
-				return esc_html__( 'Paid', 'ifthenpay-payments-for-gravityforms' );
-			case 'pending':
-				return esc_html__( 'Pending', 'ifthenpay-payments-for-gravityforms' );
+				return esc_html__( 'User Paid with Success!', 'ifthenpay-payments-for-gravityforms' );
 			case 'cancelled':
-				return esc_html__( 'Cancelled', 'ifthenpay-payments-for-gravityforms' );
+				return esc_html__( 'User Cancelled the Payment', 'ifthenpay-payments-for-gravityforms' );
 			case 'failed':
 				$error = (string) gform_get_meta( $entry_id, 'iftp_gf_error_message' );
-				return $error !== '' ? esc_html( $error ) : esc_html__( 'Failed', 'ifthenpay-payments-for-gravityforms' );
+				return $error !== '' ? esc_html( $error ) : esc_html__( 'User Payment Failed', 'ifthenpay-payments-for-gravityforms' );
 			default:
 				return '';
 		}

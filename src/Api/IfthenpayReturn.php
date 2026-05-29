@@ -18,8 +18,7 @@ final class IfthenpayReturn {
 	public static function get_return_data_from_request(): array {
 		$query_args = wp_unslash( filter_input_array( INPUT_GET ) ?: array() );
 
-		// Required: iftp_gf_pay status flag + iftp_gateway sentinel
-		// (matches build_gateway_urls()).
+
 		if ( empty( $query_args ) || empty( $query_args['iftp_gf_pay'] ) || empty( $query_args['iftp_gateway'] ) ) {
 			return array();
 		}
@@ -28,18 +27,18 @@ final class IfthenpayReturn {
 			'iftp_gf_pay' => sanitize_text_field( (string) $query_args['iftp_gf_pay'] ),
 		);
 
-		// `id` is the GF entry ID (passed as $payment_id to build_gateway_urls).
+
 		$entry_id = isset( $query_args['id'] ) ? absint( $query_args['id'] ) : 0;
 		if ( $entry_id > 0 ) {
 			$return_data['entry_id'] = $entry_id;
 		}
 
-		$transaction_id = self::sanitize_transaction_id( $query_args['transactionId'] );
+		$transaction_id = self::sanitize_transaction_id( (string) ( $query_args['transactionId'] ?? '' ) );
 		if ( $transaction_id !== '' ) {
 			$return_data['transaction_id'] = $transaction_id;
 		}
 
-		$payment_method = (string) ( $query_args['PaymentMethod'] );
+		$payment_method = (string) ( $query_args['PaymentMethod'] ?? '' );
 		if ( $payment_method !== '' ) {
 			$return_data['payment_method'] = $payment_method;
 		}

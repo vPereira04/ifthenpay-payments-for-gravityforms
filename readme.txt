@@ -89,10 +89,10 @@ This plugin integrates with the ifthenpay payment platform to process payments f
 All network requests are performed server-side over HTTPS. Sensitive credentials are stored securely and are not publicly exposed. No raw card or bank details are stored.
 
 == Screenshots ==
-1. **(Admin Only) Backoffice Synchronization under GravityForms Settings Payments**
+1. **(Admin Only) Backoffice Synchronization (GravityForms Settings -> Ifthenpay)**
 2. **(Admin Only) Adding ifthenpay's Payment field to the selected form**
-3. **(Admin Only) GravityForms's admin page (Creation/Editing Form -> Settings)**
-4. **(Admin Only) ifthenpay's Gateway Configuration on Feed Settings**
+3. **(Admin Only) GravityForms's Form Feed Settings (Creation/Editing Form -> Settings)**
+4. **(Admin Only) ifthenpay's Gateway Configuration on a Feed Setting**
 5. **(Customers Experience) Payment Gateway field display varies by GravityForms settings**
 6. **(Customers Experience) Payment Window**
 

@@ -163,6 +163,7 @@ class Addon extends \GFPaymentAddOn {
 				'version' => \IFTP_GF_VERSION,
 				'enqueue' => array(
 					array( 'admin_page' => array( 'plugin_settings' ) ),
+					array( 'admin_page' => array( 'form_list' ) ),
 					array( 'admin_page' => array( 'form_settings' ) ),
 					array( 'admin_page' => array( 'form_editor' ) ),
 					array( 'admin_page' => array( 'entry_list' ) ),
@@ -291,6 +292,13 @@ class Addon extends \GFPaymentAddOn {
 						'name'    => 'description',
 						'class'   => 'medium',
 						'tooltip' => __( 'Optional description shown on the payment page (e.g., the store or product name).', 'ifthenpay-payments-for-gravityforms' ),
+					),
+					array(
+						'label'   => __( 'Payment Expire Date (days)', 'ifthenpay-payments-for-gravityforms' ),
+						'type'    => 'text',
+						'name'    => 'expire_days',
+						'class'   => 'small',
+						'tooltip' => __( 'Number of days before the payment link expires. Minimum 1. Leave blank to use the default (1 day).', 'ifthenpay-payments-for-gravityforms' ),
 					),
 				),
 			),
@@ -767,10 +775,12 @@ class Addon extends \GFPaymentAddOn {
 			);
 		}
 
-		$snapshot = array(
+		$expire_days_raw = (int) ( $settings['expire_days'] ?? 0 );
+		$snapshot        = array(
 			'gateway_key'     => $gateway_key,
 			'default_method'  => strtoupper( (string) ( $settings['default_method'] ?? '' ) ),
 			'pay_description' => sanitize_text_field( (string) ( $settings['description'] ?? '' ) ),
+			'expire_days'     => $expire_days_raw > 0 ? $expire_days_raw : 1,
 			'pay_methods'     => $pay_methods,
 		);
 
@@ -878,6 +888,7 @@ class Addon extends \GFPaymentAddOn {
 		gform_update_meta( $entry_id, 'iftp_gf_gateway_key', $gateway_key );
 		gform_update_meta( $entry_id, 'iftp_gf_payment_status', 'pending' );
 		gform_update_meta( $entry_id, 'iftp_gf_payment_amount', $amount );
+		gform_update_meta( $entry_id, 'iftp_gf_error_message', $redirect_url );
 
 		\GFAPI::update_entry_property( $entry_id, 'payment_amount', $amount );
 		\GFAPI::update_entry_property( $entry_id, 'payment_status', 'Processing' );

@@ -275,13 +275,13 @@ All network requests are performed server-side over HTTPS. Sensitive credentials
 
 Below are screenshots demonstrating key features and interfaces of the plugin:
 
-1. **(Admin Only) Backoffice Synchronization under GravityForms Settings Payments**
+1. **(Admin Only) Backoffice Synchronization (GravityForms Settings -> Ifthenpay)**
    ![Backoffice Settings](.wordpress-org/screenshot-1.png)
 2. **(Admin Only) Adding ifthenpay's Payment field to the selected form**
    ![Adding Field to Form](.wordpress-org/screenshot-2.png)
-3. **(Admin Only) GravityForms's admin page (Creation/Editing Form -> Settings)**
+3. **(Admin Only) GravityForms's Form Feed Settings (Creation/Editing Form -> Settings)**
    ![How to enter Feed Settings](.wordpress-org/screenshot-3.png)
-4. **(Admin Only) ifthenpay's Gateway Configuration on Feed Settings**
+4. **(Admin Only) ifthenpay's Gateway Configuration on a Feed Setting**
    ![Gateway Settings](.wordpress-org/screenshot-4.png)
 5. **(Customers Experience) Payment Gateway field display varies by GravityForms settings**
    ![Backoffice Settings](.wordpress-org/screenshot-5.png)
